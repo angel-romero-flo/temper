@@ -9,7 +9,7 @@ initial = "Idle"
 [[state]]
 name = "batches_executed"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "ToolCallBatchRequested"
@@ -22,7 +22,7 @@ name = "tool_execute_trigger"
 kind = "entity"
 target_entity = "ToolExecutorIntegration"
 target_action = "execute_tool_batch"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ToolCallBatchComplete"
@@ -36,7 +36,7 @@ name = "tools_complete_to_agent"
 kind = "entity"
 target_entity = "Process"
 target_action = "ToolCallBatchComplete"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ToolCallBatchFailed"
@@ -49,7 +49,7 @@ name = "tools_failed_to_agent"
 kind = "entity"
 target_entity = "Process"
 target_action = "ToolCallBatchFailed"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "BatchNeedsApproval"
@@ -68,7 +68,7 @@ name = "tool_execute_trigger"
 kind = "entity"
 target_entity = "ToolExecutorIntegration"
 target_action = "execute_tool_batch"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ApprovalDenied"

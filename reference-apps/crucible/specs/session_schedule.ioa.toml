@@ -24,7 +24,7 @@ terminal = ["Expired"]
 [[state]]
 name = "run_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions ---
 

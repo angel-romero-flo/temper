@@ -12,7 +12,7 @@ strict_action_params = true
 [[state]]
 name = "ticks"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "Tick"
 from = ["Idle"]
@@ -108,7 +108,7 @@ strict_action_params = true
 [[state]]
 name = "ticks"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "Fail"
 from = ["Idle"]
@@ -229,7 +229,7 @@ strict_action_params = true
 [[state]]
 name = "ticks"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "Tick"
 from = ["Idle"]
@@ -369,7 +369,7 @@ strict_action_params = true
 [[state]]
 name = "ticks"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "Tick"
 from = ["Idle"]

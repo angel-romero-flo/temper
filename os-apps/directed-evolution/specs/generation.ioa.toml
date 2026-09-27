@@ -7,12 +7,12 @@ allow_indefinite_states = ["Planned", "Generating", "Evaluating", "Selecting"]
 [[state]]
 name = "variant_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "survivor_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "StartGeneration"

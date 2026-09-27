@@ -54,8 +54,6 @@ pub struct ReactionTrigger {
     pub entity_type: String,
     /// The action name that triggers this reaction. `None` = any action.
     pub action: Option<String>,
-    /// The target state after the action. `None` = any resulting state.
-    pub to_state: Option<String>,
     /// Optional guard over the source entity's post-action fields and status
     /// (and related entities' statuses). When `Some`, the reaction only fires
     /// if the guard holds. Guard-skipped rules do NOT emit a
@@ -71,20 +69,15 @@ pub struct ReactionTarget {
     pub entity_type: String,
     /// The action to dispatch (e.g., "AuthorizePayment").
     pub action: String,
-    /// Static parameters to pass to the target action.
-    #[serde(default)]
-    pub params: serde_json::Value,
-    /// Dynamic params: target-param-name → source-entity-field-name.
-    ///
-    /// At dispatch time, each key is read from the source entity's fields and
-    /// merged into the effective params object. Collides with `params` keys
-    /// are rejected at registry parse time. A missing source field logs a
-    /// warning and skips the key — the reaction still fires with a partial
-    /// param map (consistent with `resolver::Field`'s `None`-on-missing posture).
+    /// Parameters for the target action: literals, or fields of the source
+    /// entity read after it commits (`Id` is its id). A field the source does
+    /// not have leaves its key out — the reaction still fires with the other
+    /// parameters (consistent with `resolver::Field`'s `None`-on-missing
+    /// posture).
     ///
     /// `BTreeMap` for deterministic iteration order (DST compliance).
     #[serde(default)]
-    pub params_from: BTreeMap<String, String>,
+    pub args: BTreeMap<String, temper_spec::predicate::Arg>,
 }
 
 /// How to resolve the target entity ID for a reaction.
@@ -150,14 +143,12 @@ mod tests {
             when: ReactionTrigger {
                 entity_type: "Order".to_string(),
                 action: Some("ConfirmOrder".to_string()),
-                to_state: Some("Confirmed".to_string()),
-                guard: None,
+                guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "AuthorizePayment".to_string(),
-                params: serde_json::json!({}),
-                params_from: BTreeMap::new(),
+                args: BTreeMap::new(),
             },
             resolve_target: TargetResolver::Field {
                 field: "payment_id".to_string(),
@@ -173,31 +164,34 @@ mod tests {
     }
 
     #[test]
-    fn reaction_target_serialises_params_from() {
-        let mut pf = BTreeMap::new();
-        pf.insert("job_type".to_string(), "next_stage".to_string());
+    fn reaction_target_serialises_args() {
+        let mut args = BTreeMap::new();
+        args.insert(
+            "job_type".to_string(),
+            temper_spec::predicate::parse_arg("next_stage").unwrap(),
+        );
+        args.insert(
+            "source".to_string(),
+            temper_spec::predicate::parse_arg("'curation'").unwrap(),
+        );
         let target = ReactionTarget {
             entity_type: "CurationJob".to_string(),
             action: "Submit".to_string(),
-            params: serde_json::json!({}),
-            params_from: pf,
+            args,
         };
         let json = serde_json::to_string(&target).unwrap();
-        assert!(json.contains("\"params_from\""));
-        assert!(json.contains("\"job_type\":\"next_stage\""));
+        assert!(json.contains("\"job_type\":\"next_stage\""), "{json}");
+        assert!(json.contains("\"source\":\"'curation'\""), "{json}");
 
         let back: ReactionTarget = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            back.params_from.get("job_type").map(String::as_str),
-            Some("next_stage")
-        );
+        assert_eq!(back.args, target.args);
     }
 
     #[test]
-    fn reaction_target_defaults_params_from_empty() {
+    fn reaction_target_defaults_args_empty() {
         let json = r#"{"entity_type":"B","action":"Do"}"#;
         let target: ReactionTarget = serde_json::from_str(json).unwrap();
-        assert!(target.params_from.is_empty());
+        assert!(target.args.is_empty());
     }
 
     #[test]

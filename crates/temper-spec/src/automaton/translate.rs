@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use super::types::{Action, Automaton, Effect, TriggerKind};
+use super::types::{Action, ActionKind, Automaton, Effect, TriggerKind};
 use crate::predicate::{Arg, AssignOp, Expr, VarKind};
 
 // ---------------------------------------------------------------------------
@@ -103,13 +103,13 @@ pub fn translate_actions(automaton: &Automaton) -> Vec<ResolvedAction> {
     let kinds: BTreeMap<&str, VarKind> = automaton
         .state
         .iter()
-        .map(|s| (s.name.as_str(), VarKind::from_type(&s.var_type)))
+        .map(|s| (s.name.as_str(), s.var_type.kind()))
         .collect();
 
     automaton
         .actions
         .iter()
-        .filter(|a| a.kind != "output")
+        .filter(|a| a.kind != ActionKind::Output)
         .map(|a| {
             let mut effects: Vec<ResolvedEffect> =
                 a.effect.iter().map(|e| resolve_effect(e, &kinds)).collect();

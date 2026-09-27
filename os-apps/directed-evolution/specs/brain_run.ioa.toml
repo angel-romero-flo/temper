@@ -7,7 +7,7 @@ allow_indefinite_states = ["Queued", "Running"]
 [[state]]
 name = "started"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "StartBrainRun"

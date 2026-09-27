@@ -7,7 +7,7 @@ allow_indefinite_states = ["Pending", "Running", "Failed"]
 [[state]]
 name = "has_evidence"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "StartStageResult"

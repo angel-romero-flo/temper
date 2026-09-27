@@ -209,19 +209,19 @@ initial = "Ready"
 [[state]]
 name = "sequence"
 type = "counter"
-initial = "3"
+initial = 3
 [[state]]
 name = "enabled"
 type = "bool"
-initial = "TRUE"
+initial = true
 [[state]]
 name = "members"
 type = "list"
-initial = '["first"]'
+initial = ["first"]
 [[state]]
 name = "offset"
-type = "integer"
-initial = "-3"
+type = "int"
+initial = -3
 [[action]]
 name = "Advance"
 kind = "input"

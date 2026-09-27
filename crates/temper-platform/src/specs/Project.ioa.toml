@@ -6,12 +6,12 @@ states = ["Created", "Building", "Verified", "Archived"]
 [[state]]
 name = "spec_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "verified"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "CreateProject"

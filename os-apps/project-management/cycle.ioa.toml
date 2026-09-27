@@ -13,12 +13,12 @@ terminal = ["Completed"]
 [[state]]
 name = "issue_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "completed_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "project_id"

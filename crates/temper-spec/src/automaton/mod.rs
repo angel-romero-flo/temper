@@ -14,7 +14,6 @@
 
 mod contracts;
 pub mod field_invariant;
-mod initial;
 pub mod legacy;
 mod lint;
 pub mod metadata;
@@ -23,11 +22,9 @@ mod toml_parser;
 pub mod translate;
 pub mod trigger_graph;
 mod types;
+mod validate;
 
 pub use field_invariant::FieldInvariant;
-pub use initial::{
-    parse_bool_initial, parse_counter_initial_usize, parse_list_initial, parse_var_initial_json,
-};
 pub use lint::{
     BundleLintFinding, LintFinding, LintSeverity, lint_automata_bundle, lint_automaton,
 };
@@ -39,3 +36,7 @@ pub use parser::{
 pub use translate::{ResolvedAction, ResolvedEffect, dispatch_effects, translate_actions};
 pub use trigger_graph::{TriggerEdge, TriggerGraph};
 pub use types::*;
+
+#[cfg(test)]
+#[path = "strict_test.rs"]
+mod strict_test;

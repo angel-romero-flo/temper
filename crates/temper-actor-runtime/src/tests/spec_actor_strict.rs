@@ -21,17 +21,17 @@ initial = "release-a"
 [[state]]
 name = "rounds"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "enabled"
 type = "bool"
-initial = "TRUE"
+initial = true
 
 [[state]]
 name = "members"
 type = "list"
-initial = '["first"]'
+initial = ["first"]
 
 [[action]]
 name = "StartProcess"
@@ -50,7 +50,7 @@ name = "processed"
 kind = "entity"
 target_entity = "Audit"
 target_action = "Record"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "SendInput"
@@ -69,7 +69,7 @@ name = "processed"
 kind = "entity"
 target_entity = "Audit"
 target_action = "Record"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "Noop"
@@ -256,7 +256,7 @@ initial = "Idle"
 [[state]]
 name = "rounds"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Start"
@@ -299,14 +299,14 @@ name = "prepare"
 kind = "entity"
 target_entity = "ContextManager"
 target_action = "PrepareContext"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action.triggers]]
 name = "audit"
 kind = "entity"
 target_entity = "Audit"
 target_action = "Record"
-resolve_target = { type = "create" }
+resolve_target = { kind = "create" }
 "#;
         let automaton = temper_spec::parse_automaton(spec).unwrap();
         let routing = build_actor_routing(&automaton);

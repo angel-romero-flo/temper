@@ -3149,8 +3149,8 @@ target_entity = "Payment"
 target_action = "AuthorizePayment"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "payment_id"
+kind = "field"
+id_field = "payment_id"
 "#,
     )
     .unwrap();

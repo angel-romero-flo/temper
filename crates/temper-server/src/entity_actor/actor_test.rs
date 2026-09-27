@@ -15,13 +15,12 @@ fn composite_table() -> Arc<RwLock<TransitionTable>> {
         r#"
 [automaton]
 name = "Repository"
-version = "1.0.0"
 states = ["Active"]
 initial = "Active"
 
 [[action]]
 name = "IngestPack"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 params = ["PackBytes", "RefUpdates", "ClientRequestId"]
@@ -1324,12 +1323,12 @@ initial = "Created"
 [[state]]
 name = "version_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_content"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "Create"

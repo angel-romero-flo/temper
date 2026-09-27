@@ -7,7 +7,7 @@ allow_indefinite_states = ["Proposed", "Selected", "Dismissed"]
 [[state]]
 name = "has_provenance"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "ProposeDirection"

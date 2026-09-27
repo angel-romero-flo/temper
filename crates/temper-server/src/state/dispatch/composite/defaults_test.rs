@@ -10,7 +10,7 @@ async fn parent_gated_contracted_creation_preserves_defaults_on_both_recovery_pa
         )
         .replacen(
             "[[action]]",
-            "[[state]]\nname = \"revision\"\ntype = \"counter\"\ninitial = \"7\"\n[[action]]",
+            "[[state]]\nname = \"revision\"\ntype = \"counter\"\ninitial = 7\n[[action]]",
             1,
         );
     let state = ServerState::with_storage_stack(

@@ -9,11 +9,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use temper_spec::automaton::{
-    Automaton, ResolvedEffect, parse_bool_initial, parse_counter_initial_usize, parse_list_initial,
-    translate_actions,
-};
-use temper_spec::predicate::{Arg, Literal, ParamKind, VarKind};
+use temper_spec::automaton::{Automaton, Initial, ResolvedEffect, translate_actions};
+use temper_spec::predicate::{Arg, Literal, ParamKind};
 
 use super::types::{
     LivenessKind, ModelEffect, ResolvedInvariant, ResolvedLiveness, ResolvedTransition, TemperModel,
@@ -43,23 +40,19 @@ pub fn build_model_from_automaton(automaton: &Automaton, max_counter: usize) -> 
     let mut counter_bounds = BTreeMap::new();
 
     for sv in &automaton.state {
-        match sv.var_type.as_str() {
-            "counter" => {
-                let init_val = parse_counter_initial_usize(&sv.initial);
-                initial_counters.insert(sv.name.clone(), init_val);
+        match &sv.initial {
+            Initial::Counter(n) => {
+                initial_counters.insert(sv.name.clone(), *n);
                 counter_bounds.insert(sv.name.clone(), max_counter);
             }
-            "bool" => {
-                let init_val = parse_bool_initial(&sv.initial);
-                initial_booleans.insert(sv.name.clone(), init_val);
+            Initial::Bool(b) => {
+                initial_booleans.insert(sv.name.clone(), *b);
             }
-            "list" | "set" => {
-                initial_lists.insert(sv.name.clone(), parse_list_initial(&sv.initial));
+            Initial::List(items) => {
+                initial_lists.insert(sv.name.clone(), items.clone());
             }
-            _ => {
-                // Keep verification robust against partially modeled types.
-                // Semantic linting reports unsupported state variable types.
-            }
+            // Strings and ints are not modeled.
+            Initial::String(_) | Initial::Int(_) => {}
         }
     }
 
@@ -92,7 +85,7 @@ pub fn build_model_from_automaton(automaton: &Automaton, max_counter: usize) -> 
     let var_kinds = automaton
         .state
         .iter()
-        .map(|sv| (sv.name.clone(), VarKind::from_type(&sv.var_type)))
+        .map(|sv| (sv.name.clone(), sv.var_type.kind()))
         .collect();
 
     TemperModel {
@@ -413,17 +406,17 @@ initial = "Planning"
 [[state]]
 name = "migrations_ok"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "typecheck_ok"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "unit_tests_ok"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "EnterTesting"
@@ -476,7 +469,7 @@ initial = "Planning"
 [[state]]
 name = "migrations_ok"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "Ship"

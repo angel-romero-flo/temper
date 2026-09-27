@@ -21,7 +21,6 @@ pub mod tlaplus;
 // Re-export primary public API at crate root.
 pub use automaton::{
     Automaton, FieldInvariant, LintFinding, LintSeverity, lint_automaton, parse_automaton,
-    parse_bool_initial, parse_counter_initial_usize, parse_list_initial, parse_var_initial_json,
     to_state_machine,
 };
 pub use cross_invariant::{

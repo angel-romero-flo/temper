@@ -342,8 +342,22 @@ impl crate::state::ServerState {
 
             let armed_seq = self.state_timeout_tracker.bump(&key);
             self.state_timeout_tracker.inc_pending(ctx.entity_type);
-            let params: serde_json::Value = serde_json::to_value(&st.params)
-                .unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()));
+            // ADR-0181: `args` are read when the timer is armed, against the
+            // entity as it entered the state.
+            let (params, missing) = temper_spec::automaton::resolve_args(
+                &st.args,
+                ctx.entity_id,
+                &response.state.fields,
+            );
+            for field in missing {
+                tracing::warn!(
+                    entity_type = ctx.entity_type,
+                    state = %st.state,
+                    source_field = field,
+                    "state_timeout arg reads a missing field; skipping key"
+                );
+            }
+            let params = serde_json::Value::Object(params);
 
             let state = self.clone();
             let tracker = self.state_timeout_tracker.clone();
@@ -630,12 +644,12 @@ allow_indefinite_states = ["InProgress", "WaitingOnCustomer", "Resolved", "Close
 [[state]]
 name = "replies"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "customer_responded"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "AssignAgent"
@@ -661,7 +675,7 @@ allow_indefinite_states = ["Open", "InProgress", "WaitingOnCustomer", "Resolved"
 [[state]]
 name = "replies"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AssignAgent"
@@ -865,7 +879,7 @@ allow_indefinite_states = ["Open", "InProgress", "WaitingOnCustomer", "Resolved"
 [[state]]
 name = "replies"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AssignAgent"
@@ -1042,7 +1056,7 @@ allow_indefinite_states = ["Open", "InProgress", "WaitingOnCustomer", "Resolved"
 [[state]]
 name = "replies"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AssignAgent"

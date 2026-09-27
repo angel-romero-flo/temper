@@ -18,15 +18,15 @@ initial = "Created"
 [[state]]
 name = "candidate_count"
 type = "counter"
-initial = "0"
+initial = 0
 [[state]]
 name = "mutation_attempts"
 type = "counter"
-initial = "0"
+initial = 0
 [[state]]
 name = "generation"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "Start"
 kind = "input"

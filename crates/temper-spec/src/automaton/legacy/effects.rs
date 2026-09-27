@@ -2,8 +2,8 @@
 //! strings (`"increment items"`, `"set ready true"`) and `{ type = ... }`
 //! tables. Read only by the converter.
 
+use super::{scalar_string, unsigned};
 use crate::automaton::parser::AutomatonParseError;
-use crate::automaton::toml_parser::values::{scalar_string, unsigned};
 use toml::{Table, Value};
 
 /// An effect in the old syntax.

@@ -18,57 +18,57 @@ terminal = ["Archived"]
 [[state]]
 name = "assignee_set"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "planner_set"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "has_plan"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "priority"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "label_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_parent"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "sub_issue_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "comment_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "review_cycles"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "plan_revision_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_description"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions: Parent/Sub-Issue Hierarchy ---
 

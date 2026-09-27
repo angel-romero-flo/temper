@@ -10,7 +10,7 @@ initial = "Active"
 [[state]]
 name = "processes_started"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Initialize"

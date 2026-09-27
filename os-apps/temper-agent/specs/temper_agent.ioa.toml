@@ -53,7 +53,7 @@ initial = ""
 [[state]]
 name = "turn_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "max_turns"
@@ -63,12 +63,12 @@ initial = "20"
 [[state]]
 name = "input_tokens"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "output_tokens"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "cost_cents"
@@ -83,7 +83,7 @@ initial = ""
 [[state]]
 name = "has_result"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "error_message"
@@ -155,7 +155,7 @@ initial = ""
 [[state]]
 name = "context_tokens"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- State Variables: Compaction (Phase 3) ---
 
@@ -172,7 +172,7 @@ initial = "10000"
 [[state]]
 name = "compaction_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "compaction_model"
@@ -189,7 +189,7 @@ initial = "[]"
 [[state]]
 name = "follow_up_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "max_follow_ups"
@@ -225,7 +225,7 @@ initial = "[]"
 [[state]]
 name = "agent_depth"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- State Variables: Heartbeat (Phase 8) ---
 

@@ -14,12 +14,12 @@ initial = "Idle"
 [[state]]
 name = "current_step"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "can_escalate"
 type = "bool"
-initial = "true"
+initial = true
 
 # --- Actions: Escalation Lifecycle ---
 

@@ -7,7 +7,7 @@ allow_indefinite_states = ["Planned", "Running", "Succeeded", "Failed"]
 [[state]]
 name = "has_agent"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "StartTrial"

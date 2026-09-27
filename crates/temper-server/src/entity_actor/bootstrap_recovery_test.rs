@@ -103,7 +103,7 @@ strict_action_params = true
 [[state]]
 name = "revision"
 type = "counter"
-initial = "7"
+initial = 7
 [[action]]
 name = "Advance"
 kind = "input"
@@ -156,7 +156,7 @@ strict_action_params = true
 [[state]]
 name = "revision"
 type = "counter"
-initial = "7"
+initial = 7
 [[state]]
 name = "name"
 type = "string"
@@ -164,11 +164,11 @@ initial = "original"
 [[state]]
 name = "enabled"
 type = "bool"
-initial = "TRUE"
+initial = true
 [[state]]
 name = "members"
 type = "list"
-initial = '["first"]'
+initial = ["first"]
 [[action]]
 name = "Advance"
 kind = "input"
@@ -213,7 +213,7 @@ constraints = [{kind="param_equals_field",param="expected",field="revision"}]
         7
     );
     let changed = source
-        .replace("initial = \"7\"", "initial = \"9\"")
+        .replace("initial = 7", "initial = 9")
         .replace("initial = \"original\"", "initial = \"changed\"");
     let table = TransitionTable::from_ioa_source(&changed);
     assert_eq!(

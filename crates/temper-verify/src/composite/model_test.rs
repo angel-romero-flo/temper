@@ -28,7 +28,7 @@ target_action = "AuthorizePayment"
 drop_ok = true
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#
 }
 
@@ -114,12 +114,12 @@ to = "Assigned"
 [[action.triggers]]
 name = "auto_start"
 kind = "entity"
-to_state = "Assigned"
 target_entity = "Agent"
 target_action = "Start"
+guard = "status == 'Assigned'"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 
 [[action]]
 name = "Start"

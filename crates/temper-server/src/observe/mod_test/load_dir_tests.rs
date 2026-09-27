@@ -305,15 +305,18 @@ name = "Order"
 states = ["Draft", "Done"]
 initial = "Draft"
 
-[[state]]
-name = "mood"
-type = "emotion"
-initial = "calm"
-
 [[action]]
 name = "Complete"
 from = ["Draft"]
 to = "Done"
+
+[[field_invariant]]
+name = "Twice"
+assert = "true"
+
+[[field_invariant]]
+name = "Twice"
+assert = "true"
 "#,
     )
     .expect("write ioa");

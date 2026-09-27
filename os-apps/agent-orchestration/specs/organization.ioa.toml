@@ -21,7 +21,7 @@ initial = ""
 [[state]]
 name = "member_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "budget_monthly_cents"
@@ -36,7 +36,7 @@ initial = "0"
 [[state]]
 name = "active_runs"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions ---
 

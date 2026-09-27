@@ -38,9 +38,9 @@ pub struct TriggerEdge {
     pub to: String,
     /// Action dispatched on the target entity.
     pub target_action: String,
-    /// Optional `to_state` filter carried from the spec. When `Some`, the
-    /// edge only fires if the source action transitions to this state.
-    pub to_state: Option<String>,
+    /// The source statuses the trigger fires in, derived from its guard
+    /// (`ActionTrigger::status_filter`). `None` fires on every commit.
+    pub status_filter: Option<Vec<String>>,
     /// Whether the spec asks for the composite verifier to emit a
     /// `Property::eventually` for this chain.
     pub liveness_required: bool,
@@ -184,7 +184,7 @@ fn edge_from_trigger(
         trigger_name: trigger.name.clone(),
         to: target_entity,
         target_action,
-        to_state: trigger.to_state.clone(),
+        status_filter: trigger.status_filter(),
         liveness_required: matches!(trigger.liveness, super::types::TriggerLiveness::Required),
         creates_target,
         drop_ok: trigger.drop_ok,
@@ -221,8 +221,8 @@ target_entity = "Payment"
 target_action = "AuthorizePayment"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "payment_id"
+kind = "field"
+id_field = "payment_id"
 "#
     }
 
@@ -331,10 +331,10 @@ kind = "entity"
 principal = "agent-supervisor"
 target_entity = "Agent"
 target_action = "Start"
-to_state = "Assigned"
+guard = "status == 'Assigned'"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 
 [[action]]
 name = "Start"
@@ -404,7 +404,7 @@ target_entity = "Y"
 target_action = "Do"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
         let x = parse_automaton(spec).unwrap();
         let graph = TriggerGraph::from_automatons(&[&x]);

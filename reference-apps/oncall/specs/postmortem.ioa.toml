@@ -15,12 +15,12 @@ terminal = ["Published"]
 [[state]]
 name = "has_root_cause"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "review_rounds"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions: Postmortem Lifecycle ---
 

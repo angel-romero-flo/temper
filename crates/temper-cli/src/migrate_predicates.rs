@@ -3,8 +3,11 @@
 //! Converts IOA specs written in the old syntax (guard tables and clauses,
 //! `when` + `assert`, `no_further_transitions`, trigger-guard and
 //! field-predicate tables, verb and table effects, `[[integration]]` blocks,
-//! `trigger` and `emit` effects) to the current grammar. Files are rewritten
-//! in place with comments and layout kept; `-` converts stdin to stdout.
+//! `trigger` and `emit` effects) and the value spellings and key names that
+//! preceded strict typed reading (string booleans and numbers, string
+//! initials, `to_state`, `params`/`params_from`, ...; ADR-0181) to the current
+//! syntax. Files are rewritten in place with comments and layout kept; `-`
+//! converts stdin to stdout.
 
 use std::io::{Read as _, Write as _};
 

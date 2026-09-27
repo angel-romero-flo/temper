@@ -7,17 +7,17 @@ allow_indefinite_states = ["Pending", "Promoted"]
 [[state]]
 name = "has_evidence"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "materialized"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "materialization_failed"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "PromoteWinner"

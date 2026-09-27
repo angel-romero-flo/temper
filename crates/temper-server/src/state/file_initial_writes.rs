@@ -431,7 +431,7 @@ strict_action_params = true
 [[state]]
 name = "revision"
 type = "counter"
-initial = "3"
+initial = 3
 [[action]]
 name = "StreamUpdated"
 kind = "input"

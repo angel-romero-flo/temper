@@ -2,6 +2,7 @@ use super::super::*;
 #[allow(unused_imports)]
 use super::ORDER_IOA;
 use crate::automaton::{ResolvedEffect, dispatch_effects};
+use crate::predicate::{Arg, Literal};
 
 // ADR-0046: `[[agent_trigger]]` retired along with the AgentTrigger struct.
 // The equivalent behavior is now an `[[action.triggers]]` block with
@@ -31,8 +32,8 @@ target_entity = "FileVersion"
 target_action = "Create"
 
 [action.triggers.resolve_target]
-type = "create_if_missing"
 id_field = "last_version_id"
+kind = "create_if_missing"
 "#;
     let automaton = parse_automaton(spec).expect("action.triggers should parse");
     assert_eq!(automaton.actions.len(), 1);
@@ -89,7 +90,7 @@ target_entity = "AuditLog"
 target_action = "Record"
 
 [action.triggers.resolve_target]
-type = "create"
+kind = "create"
 "#;
     let automaton = parse_automaton(spec).expect("trigger without principal should parse");
     let trigger = &automaton.actions[0].triggers[0];
@@ -124,8 +125,8 @@ target_entity = "FileVersion"
 target_action = "Create"
 
 [action.triggers.resolve_target]
-type = "create_if_missing"
 id_field = "last_version_id"
+kind = "create_if_missing"
 
 [[action.triggers]]
 name = "supersede_previous"
@@ -135,8 +136,8 @@ target_entity = "FileVersion"
 target_action = "Supersede"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "last_version_id"
+kind = "field"
+id_field = "last_version_id"
 "#;
     let automaton = parse_automaton(spec).expect("multi-trigger should parse");
     let action = &automaton.actions[0];
@@ -168,7 +169,6 @@ kind = "wasm"
 module = "stripe_charge"
 on_success = "ChargeSucceeded"
 on_failure = "ChargeFailed"
-principal = "payment-service"
 
 [[action]]
 name = "ChargeSucceeded"
@@ -303,7 +303,6 @@ kind = "webhook"
 url = "https://hooks.slack.com/services/xxx"
 method = "POST"
 on_success = "NotificationSent"
-principal = "notification-service"
 
 [action.triggers.headers]
 "Content-Type" = "application/json"
@@ -359,7 +358,7 @@ type = "create"
 }
 
 #[test]
-fn test_action_triggers_to_state_filter() {
+fn test_action_triggers_status_filter_comes_from_the_guard() {
     let spec = r#"
 [automaton]
 name = "File"
@@ -375,25 +374,40 @@ to = "Ready"
 name = "only_on_ready"
 kind = "entity"
 principal = "file-service"
-to_state = "Ready"
 target_entity = "AuditLog"
 target_action = "Record"
+guard = "status == 'Ready'"
 
 [action.triggers.resolve_target]
-type = "create"
+kind = "create"
 "#;
-    let automaton = parse_automaton(spec).expect("to_state trigger should parse");
+    let automaton = parse_automaton(spec).expect("status-guarded trigger should parse");
     let trigger = &automaton.actions[0].triggers[0];
-    assert_eq!(trigger.to_state.as_deref(), Some("Ready"));
+    assert_eq!(trigger.status_filter(), Some(vec!["Ready".to_string()]));
 }
 
 #[test]
-fn test_action_triggers_params_and_params_from() {
+fn test_action_triggers_args_hold_literals_and_fields() {
     let spec = r#"
 [automaton]
 name = "Order"
 states = ["Draft", "Confirmed"]
 initial = "Draft"
+
+[[state]]
+name = "total_cents"
+type = "counter"
+initial = 0
+
+[[state]]
+name = "currency_code"
+type = "string"
+initial = ""
+
+[[state]]
+name = "payment_id"
+type = "string"
+initial = ""
 
 [[action]]
 name = "ConfirmOrder"
@@ -407,30 +421,22 @@ principal = "payment-service"
 target_entity = "Payment"
 target_action = "Authorize"
 
-[action.triggers.params]
-requested_by = "system"
-
-[action.triggers.params_from]
+[action.triggers.args]
+requested_by = "'system'"
 amount = "total_cents"
 currency = "currency_code"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "payment_id"
+kind = "field"
+id_field = "payment_id"
 "#;
-    let automaton = parse_automaton(spec).expect("params trigger should parse");
+    let automaton = parse_automaton(spec).expect("args trigger should parse");
     let trigger = &automaton.actions[0].triggers[0];
+    assert_eq!(trigger.args["amount"], Arg::Var("total_cents".into()));
+    assert_eq!(trigger.args["currency"], Arg::Var("currency_code".into()));
     assert_eq!(
-        trigger.params_from.get("amount").map(String::as_str),
-        Some("total_cents")
-    );
-    assert_eq!(
-        trigger.params_from.get("currency").map(String::as_str),
-        Some("currency_code")
-    );
-    assert_eq!(
-        trigger.params.get("requested_by").and_then(|v| v.as_str()),
-        Some("system")
+        trigger.args["requested_by"],
+        Arg::Lit(Literal::Str("system".into()))
     );
 }
 
@@ -454,7 +460,7 @@ kind = "entity"
 target_action = "Do"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("missing target_entity must fail");
     let msg = err.to_string();
@@ -479,7 +485,7 @@ kind = "entity"
 target_entity = "Y"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("missing target_action must fail");
     assert!(err.to_string().contains("target_action"));
@@ -590,12 +596,12 @@ to = "B"
 [[action.triggers]]
 name = "bad"
 kind = "entity"
-to_state = "NotAState"
 target_entity = "Y"
 target_action = "Do"
+guard = "status == 'NotAState'"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("bad to_state must fail");
     assert!(err.to_string().contains("NotAState"));
@@ -641,14 +647,11 @@ kind = "entity"
 target_entity = "Y"
 target_action = "Do"
 
-[action.triggers.params]
-amount = "fixed"
-
-[action.triggers.params_from]
+[action.triggers.args]
 amount = "total"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("params/params_from collision must fail");
     let msg = err.to_string();
@@ -674,7 +677,7 @@ target_entity = "Y"
 target_action = "Do"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 
 [[action.triggers]]
 name = "dup"
@@ -683,7 +686,7 @@ target_entity = "Z"
 target_action = "Go"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("duplicate trigger name must fail");
     assert!(err.to_string().contains("dup"));
@@ -708,7 +711,7 @@ target_entity = "Y"
 target_action = "Do"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let err = parse_automaton(spec).expect_err("empty trigger name must fail");
     assert!(err.to_string().contains("empty"));
@@ -984,7 +987,7 @@ target_entity = "FileVersion"
 target_action = "Create"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
     let automaton = parse_automaton(spec).expect("entity-kind should parse");
     assert!(

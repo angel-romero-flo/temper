@@ -218,9 +218,9 @@ impl CompositeVerificationPlan {
             .iter()
             .map(|e| {
                 let state = e
-                    .to_state
-                    .as_deref()
-                    .map(|s| format!(" @{s}"))
+                    .status_filter
+                    .as_ref()
+                    .map(|statuses| format!(" @{}", statuses.join("|")))
                     .unwrap_or_default();
                 let liveness = if e.liveness_required {
                     " (required)"
@@ -282,8 +282,8 @@ target_entity = "Payment"
 target_action = "AuthorizePayment"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "payment_id"
+kind = "field"
+id_field = "payment_id"
 "#
     }
 
@@ -400,7 +400,7 @@ target_entity = "B"
 target_action = "Do"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
         let spec_b = r#"
 [automaton]

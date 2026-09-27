@@ -185,9 +185,9 @@ impl CompositeTemperModel {
             .filter(|e| e.from == source_entity && e.source_action == source_action)
             .collect();
         for edge in edges {
-            // to_state filter
-            if let Some(expected) = &edge.to_state
-                && expected != source_to_state
+            // The trigger's guard pins the source statuses it fires in.
+            if let Some(statuses) = &edge.status_filter
+                && !statuses.iter().any(|status| status == source_to_state)
             {
                 continue;
             }

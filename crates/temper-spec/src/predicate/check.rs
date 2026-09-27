@@ -4,32 +4,20 @@ use std::collections::BTreeMap;
 
 use super::ast::{CmpOp, Expr, Literal, Operand, Set};
 
-/// The type of a declared state variable.
+/// How the checker and the verifier read a declared state variable
+/// (`VarType::kind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VarKind {
     /// `counter`: a non-negative integer the verifier models.
     Counter,
     /// `bool`.
     Bool,
-    /// `list` or `set` of strings.
+    /// `list` of strings.
     List,
-    /// `string` or `status`.
+    /// `string`.
     Str,
-    /// `int`, `integer`, `float` or `number`: numeric but not modeled.
+    /// `int`: numeric but not modeled.
     Num,
-}
-
-impl VarKind {
-    /// Map an IOA `[[state]] type` to its kind. Unknown types read as `Str`.
-    pub fn from_type(var_type: &str) -> Self {
-        match var_type {
-            "counter" => VarKind::Counter,
-            "bool" => VarKind::Bool,
-            "list" | "set" => VarKind::List,
-            "int" | "integer" | "float" | "number" => VarKind::Num,
-            _ => VarKind::Str,
-        }
-    }
 }
 
 /// Which names an expression may read.

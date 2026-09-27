@@ -32,8 +32,25 @@ pub struct Migration {
 ///   are dropped; an action named like `AddItem` / `RemoveItem` gets the
 ///   counter effects its name used to imply
 ///
+/// - string booleans and numbers become TOML values; `[[state]] initial` is
+///   written in its type; `to_state` becomes part of the trigger `guard`;
+///   `params`/`params_from` become `args`; the other renamed keys get their
+///   current names; keys the old reader ignored are dropped (noted)
+///
 /// The result is parsed with the current parser before it is returned.
 pub fn migrate_source(source: &str) -> Result<Migration, String> {
+    let (source, notes) = rewrite(source, true)?;
+    crate::automaton::parse_automaton_with_liveness(
+        &source,
+        crate::automaton::LivenessEnforcement::WarnOnly,
+    )
+    .map_err(|e| format!("migrated spec does not parse: {e}"))?;
+    Ok(Migration { source, notes })
+}
+
+/// Run every conversion pass over `source`, without parsing the result.
+/// `drop_unknown` removes keys and sections nothing reads.
+pub(super) fn rewrite(source: &str, drop_unknown: bool) -> Result<(String, Vec<String>), String> {
     let mut doc: DocumentMut = source.parse().map_err(|e| format!("not valid TOML: {e}"))?;
     let mut notes = Vec::new();
     let kinds = state_kinds(&doc);
@@ -81,13 +98,19 @@ pub fn migrate_source(source: &str) -> Result<Migration, String> {
         }
     }
 
-    let source = doc.to_string();
-    crate::automaton::parse_automaton_with_liveness(
-        &source,
-        crate::automaton::LivenessEnforcement::WarnOnly,
-    )
-    .map_err(|e| format!("migrated spec does not parse: {e}"))?;
-    Ok(Migration { source, notes })
+    super::migrate_names::migrate_names(&mut doc, &mut notes, drop_unknown)?;
+    Ok((doc.to_string(), notes))
+}
+
+/// How the old reader typed a `[[state]] type`; unknown types read as strings.
+fn old_kind(var_type: &str) -> VarKind {
+    match var_type {
+        "counter" => VarKind::Counter,
+        "bool" => VarKind::Bool,
+        "list" | "set" => VarKind::List,
+        "int" | "integer" | "float" | "number" => VarKind::Num,
+        _ => VarKind::Str,
+    }
 }
 
 fn state_kinds(doc: &DocumentMut) -> BTreeMap<String, VarKind> {
@@ -97,7 +120,7 @@ fn state_kinds(doc: &DocumentMut) -> BTreeMap<String, VarKind> {
             let name = state.get("name").and_then(Item::as_str);
             let var_type = state.get("type").and_then(Item::as_str).unwrap_or("string");
             if let Some(name) = name {
-                kinds.insert(name.to_string(), VarKind::from_type(var_type));
+                kinds.insert(name.to_string(), old_kind(var_type));
             }
         }
     }

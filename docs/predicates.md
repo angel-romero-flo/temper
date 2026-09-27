@@ -9,7 +9,7 @@ Every condition in an IOA spec is one string in one grammar (ADR-0179):
 | `[[invariant]]` | `assert` | every reachable state (proven by the verification cascade) |
 | `[[field_invariant]]` | `assert` | the entity's fields after a write (checked on writes) |
 
-An action's `effect` is a list of statements over the same literals and names ([Effects](#effects)).
+An action's `effect` is a list of statements over the same literals and names ([Effects](#effects)), and trigger and state-timeout `args` are values in it ([Arguments](#arguments)).
 
 ```toml
 [[action]]
@@ -88,6 +88,18 @@ arg     = integer | 'string' | true | false | name | "params" "." name
 - **Nothing is implied by an action's name.** An action with no `effect` changes only `status`.
 - **Work on other entities, modules, adapters, webhooks and platform hooks** is an `[[action.triggers]]` entry, not an effect ([reactions.md](reactions.md)).
 
+## Arguments
+
+`[[action.triggers]]` and `[[state_timeout]]` pass parameters to the action they dispatch with one `args` table (ADR-0181). Each value is a string holding a literal or a name:
+
+```toml
+args = { source = "'doc'", attempts = "3", urgent = "true", reason = "null", doc_id = "Id", owner = "owner_id" }
+```
+
+- **Literals:** `'text'` in single quotes (a literal cannot contain `'`), an integer, `true`, `false`, `null`.
+- **Names:** `Id` is the entity's id; any other name is that field, read after the source action commits (triggers) or when the timer is armed (timeouts). A trigger may name a declared state variable or a parameter of its action; a timeout a declared state variable. Anything else fails to load, so a string written without its single quotes is caught.
+- **A missing field** leaves its key out of the dispatched params (logged).
+
 ## Terminal states
 
 States no action may leave are listed on the automaton, not written as an invariant:
@@ -101,7 +113,7 @@ terminal = ["Done", "Cancelled"]
 
 ## What the verifier can prove
 
-`[[invariant]]` asserts are proven over every reachable state, so they may only read what the model tracks: `status`, `counter`, `bool` and `list`/`set` state variables. An assertion over a string or number variable, an entity field, or a related entity fails to load; state it as a `[[field_invariant]]` instead, which is checked whenever the entity is written.
+`[[invariant]]` asserts are proven over every reachable state, so they may only read what the model tracks: `status`, `counter`, `bool` and `list` state variables. An assertion over a string or number variable, an entity field, or a related entity fails to load; state it as a `[[field_invariant]]` instead, which is checked whenever the entity is written.
 
 Guards may also read values the model does not track (string variables, reference fields, related entities). The verifier treats those as unknown: an action gated on one may fire, but is not guaranteed to.
 
@@ -116,3 +128,5 @@ temper migrate-predicates path/to/*.ioa.toml
 ```
 
 The converter rewrites effects as statements, moves integrations onto the actions that triggered them as `[[action.triggers]]`, writes out the effects the old action-name heuristic implied (`AddItem` incrementing counters), and prints a note for anything it drops: `emit` effects, integrations no action triggered, and webhook integrations without a `url` (which never fired).
+
+It also converts the value spellings and key names that preceded strict typed reading (ADR-0181): string booleans and numbers (`"true"`, `"0"`) become TOML values; `[[state]] initial` is written in its type; the removed type names map to `string`, `bool`, `counter`, `int` and `list`; `Composite` becomes `composite`; trigger `to_state` becomes a `status == '...'` conjunct of `guard`; `params`/`params_from` become `args`; `resolve_target` `type`/`field` become `kind`/`id_field`; webhook `entity_lookup`/`entity_param` become `entity_id = "query.<name>"`; `adapter_type` becomes `adapter`. Keys the old reader ignored — unknown keys and sections, `[automaton.timeouts]`, keys of another trigger kind (such as a `guard` on a wasm trigger), composite-only keys on other actions — are dropped with a note, so the converted spec means what the old one did.

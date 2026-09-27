@@ -166,6 +166,43 @@ impl Expr {
         }
     }
 
+    /// The statuses the expression allows, read from its top-level
+    /// `status == 'S'` and `status in ['A', ...]` conjuncts (intersected when
+    /// several pin `status`). `None` when no conjunct pins `status`.
+    pub fn required_statuses(&self) -> Option<std::collections::BTreeSet<&str>> {
+        let conjuncts = match self {
+            Expr::And(parts) => parts.as_slice(),
+            other => std::slice::from_ref(other),
+        };
+        let mut allowed: Option<std::collections::BTreeSet<&str>> = None;
+        for conjunct in conjuncts {
+            let statuses: std::collections::BTreeSet<&str> = match conjunct {
+                Expr::Compare {
+                    lhs: Operand::Status,
+                    op: CmpOp::Eq,
+                    rhs: Operand::Lit(Literal::Str(status)),
+                } => std::iter::once(status.as_str()).collect(),
+                Expr::In {
+                    value: Operand::Status,
+                    set: Set::List(items),
+                    negated: false,
+                } => items
+                    .iter()
+                    .filter_map(|item| match item {
+                        Literal::Str(status) => Some(status.as_str()),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => continue,
+            };
+            allowed = Some(match allowed {
+                Some(previous) => previous.intersection(&statuses).copied().collect(),
+                None => statuses,
+            });
+        }
+        allowed
+    }
+
     /// Every related-entity status the expression reads, deduplicated in
     /// first-use order. The runtime resolves these before evaluation.
     pub fn cross_refs(&self) -> Vec<(String, String)> {

@@ -32,7 +32,7 @@ from = ["A"]
 "#;
     let automaton: Automaton = toml::from_str(toml_src).unwrap();
     assert_eq!(automaton.actions.len(), 1);
-    assert_eq!(automaton.actions[0].kind, "internal");
+    assert_eq!(automaton.actions[0].kind, ActionKind::Internal);
     assert!(automaton.actions[0].to.is_none());
     assert!(automaton.actions[0].guard.is_always());
     assert!(automaton.actions[0].effect.is_empty());
@@ -150,13 +150,13 @@ initial = "A"
 name = "oauth_cb"
 path = "oauth/callback"
 action = "HandleCallback"
-entity_param = "state"
+entity_id = "query.state"
 "#;
     let automaton: Automaton = toml::from_str(toml_src).unwrap();
     assert_eq!(automaton.webhooks.len(), 1);
     assert_eq!(automaton.webhooks[0].name, "oauth_cb");
     assert_eq!(automaton.webhooks[0].method, "POST");
-    assert_eq!(automaton.webhooks[0].entity_lookup, "query_param");
+    assert_eq!(automaton.webhooks[0].entity_id, "query.state");
 }
 
 #[test]
@@ -265,17 +265,18 @@ initial = "A"
 [[state]]
 name = "count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "ready"
 type = "bool"
-initial = "false"
+initial = false
 "#;
     let automaton: Automaton = toml::from_str(toml_src).unwrap();
     assert_eq!(automaton.state.len(), 2);
     assert_eq!(automaton.state[0].name, "count");
-    assert_eq!(automaton.state[0].var_type, "counter");
-    assert_eq!(automaton.state[1].var_type, "bool");
-    assert_eq!(automaton.state[1].initial, "false");
+    assert_eq!(automaton.state[0].var_type, VarType::Counter);
+    assert_eq!(automaton.state[0].initial, Initial::Counter(0));
+    assert_eq!(automaton.state[1].var_type, VarType::Bool);
+    assert_eq!(automaton.state[1].initial, Initial::Bool(false));
 }

@@ -141,19 +141,18 @@ impl SpecDrivenActor {
             ..Default::default()
         };
         for var in &automaton.state {
-            match var.var_type.as_str() {
-                "counter" => {
-                    let v: usize = var.initial.parse().unwrap_or(0);
-                    init_state.counters.insert(var.name.clone(), v);
+            use temper_spec::automaton::Initial;
+            match &var.initial {
+                Initial::Counter(n) => {
+                    init_state.counters.insert(var.name.clone(), *n);
                 }
-                "bool" => {
-                    let v: bool = var.initial.parse().unwrap_or(false);
-                    init_state.booleans.insert(var.name.clone(), v);
+                Initial::Bool(b) => {
+                    init_state.booleans.insert(var.name.clone(), *b);
                 }
-                "list" | "set" => {
-                    init_state.lists.insert(var.name.clone(), Vec::new());
+                Initial::List(items) => {
+                    init_state.lists.insert(var.name.clone(), items.clone());
                 }
-                _ => {}
+                Initial::String(_) | Initial::Int(_) => {}
             }
         }
 
@@ -171,7 +170,7 @@ impl SpecDrivenActor {
         let subscriptions_static: Vec<&'static str> = automaton
             .actions
             .iter()
-            .filter(|a| a.kind == "input")
+            .filter(|a| a.kind == temper_spec::automaton::ActionKind::Input)
             .map(|a| &*Box::leak(a.name.clone().into_boxed_str()))
             .collect();
 

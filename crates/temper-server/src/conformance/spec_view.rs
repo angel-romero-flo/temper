@@ -7,8 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use temper_spec::automaton::{Action, Automaton};
-use temper_spec::predicate::{CmpOp, Expr, Literal, Operand, Set};
+use temper_spec::automaton::{Action, ActionKind, Automaton};
 
 use super::{KERNEL_PLATFORM_ACTIONS, ViolationKind};
 
@@ -29,7 +28,7 @@ pub(super) enum SourceStates<'a> {
 /// (`temper_spec::automaton::to_state_machine`), so they neither fire from a
 /// state nor land in one.
 fn is_emitted_event(action: &Action) -> bool {
-    action.kind == "output"
+    action.kind == ActionKind::Output
 }
 
 /// Legal source states for an action.
@@ -47,51 +46,19 @@ fn legal_sources(action: &Action) -> SourceStates<'_> {
     // An action written with a `state_in` guard instead of a `from` list still
     // restricts its source states; read the guard rather than treating the
     // action as unconstrained.
-    let guarded: BTreeSet<&str> = guard_status_constraint(&action.guard);
-    if !guarded.is_empty() {
+    if let Some(guarded) = action.guard.required_statuses() {
         return SourceStates::Declared(guarded);
     }
     if is_emitted_event(action) {
         return SourceStates::Unevaluable;
     }
-    if action.kind == "input" || action.kind.eq_ignore_ascii_case("composite") {
+    if action.kind.enabled_everywhere() {
         return SourceStates::AnyState;
     }
     // An `internal` action with no source at all fires from nowhere in the
     // kernel's transition table. That is a spec-authoring fault rather than a
     // run fault, so the row is reported as unchecked instead of condemned.
     SourceStates::Unevaluable
-}
-
-/// States a guard's top-level `status in [...]` / `status == '...'`
-/// conjuncts allow.
-fn guard_status_constraint(guard: &Expr) -> BTreeSet<&str> {
-    let conjuncts = match guard {
-        Expr::And(parts) => parts.as_slice(),
-        other => std::slice::from_ref(other),
-    };
-    let mut states = BTreeSet::new();
-    for conjunct in conjuncts {
-        match conjunct {
-            Expr::In {
-                value: Operand::Status,
-                set: Set::List(items),
-                negated: false,
-            } => states.extend(items.iter().filter_map(|item| match item {
-                Literal::Str(state) => Some(state.as_str()),
-                _ => None,
-            })),
-            Expr::Compare {
-                lhs: Operand::Status,
-                op: CmpOp::Eq,
-                rhs: Operand::Lit(Literal::Str(state)),
-            } => {
-                states.insert(state.as_str());
-            }
-            _ => {}
-        }
-    }
-    states
 }
 
 /// States no action can fire from.

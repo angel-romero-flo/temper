@@ -25,7 +25,7 @@ target_action = "AuthorizePayment"
 drop_ok = true
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#
 }
 
@@ -129,8 +129,8 @@ target_entity = "Workspace"
 target_action = "IncrementUsage"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#
 }
 
@@ -204,8 +204,8 @@ target_entity = "Workspace"
 target_action = "IncrementUsage"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#;
     let file = parse_automaton(file).unwrap();
     let workspace = parse_automaton(freezable_workspace()).unwrap();
@@ -252,8 +252,8 @@ target_entity = "Workspace"
 target_action = "IncrementUsage"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#;
     let file = parse_automaton(file).unwrap();
     let workspace = parse_automaton(freezable_workspace()).unwrap();
@@ -294,7 +294,7 @@ target_entity = "Version"
 target_action = "Create"
 
 [action.triggers.resolve_target]
-type = "create"
+kind = "create"
 "#;
     // Version.Create is enabled only from Current; but because the
     // resolver is `create`, a fresh Current instance is spawned — exempt.
@@ -350,8 +350,8 @@ target_action = "IncrementUsage"
 drop_ok = true
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#;
     let file = parse_automaton(file).unwrap();
     let workspace = parse_automaton(freezable_workspace()).unwrap();
@@ -375,7 +375,7 @@ fn incomplete_when_budget_exhausted() {
     // 100 forces the BFS to stop early, yielding an honest INCOMPLETE
     // (never a silent pass).
     // Counter0 declares an unreachable `Idle` state and gates every
-    // fan-out trigger on `to_state = "Idle"`. Inc goes to "Counting", so
+    // fan-out trigger on `status == 'Idle'`. Inc goes to "Counting", so
     // the triggers never actually fire: the edges exist only to pull all
     // six counters into one scope, keeping them independent (4^6 states).
     let mut hub = String::from(
@@ -389,7 +389,7 @@ allow_indefinite_states = ["Counting", "Idle"]
 [[state]]
 name = "n"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Inc"
@@ -404,13 +404,13 @@ effect = ["n += 1"]
 [[action.triggers]]
 name = "fanout_{i}"
 kind = "entity"
-to_state = "Idle"
+guard = "status == 'Idle'"
 target_entity = "Counter{i}"
 target_action = "Inc"
 drop_ok = true
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#
         ));
     }
@@ -427,7 +427,7 @@ allow_indefinite_states = ["Counting"]
 [[state]]
 name = "n"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Inc"

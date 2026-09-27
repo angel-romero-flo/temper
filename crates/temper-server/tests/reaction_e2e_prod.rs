@@ -5,7 +5,7 @@
 //!
 //! This is the verification that closes the loop the ADR promises:
 //! a reaction declared as an entity-kind `[[action.triggers]]` block
-//! (params_from + guard) actually dispatches through the live platform stack.
+//! (args + guard) actually dispatches through the live platform stack.
 
 use std::sync::Arc;
 
@@ -49,7 +49,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AddItem"
@@ -201,10 +201,10 @@ async fn prod_dispatcher_fires_basic_reaction() {
 [[action.triggers]]
 name = "order_confirmed_authorizes_payment"
 kind = "entity"
-to_state = "Confirmed"
+guard = "status == 'Confirmed'"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 "#;
     let tenant_name = "shop-e2e-1";
     let state = Arc::new(build_state(tenant_name, reactions));
@@ -271,7 +271,7 @@ kind = "entity"
 guard = "status == 'Confirmed'"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action.triggers]]
 name = "skipped_on_cancelled"
@@ -279,7 +279,7 @@ kind = "entity"
 guard = "status == 'Cancelled'"
 target_entity = "Payment"
 target_action = "FailPayment"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 "#;
     let tenant_name = "shop-e2e-2";
     let state = Arc::new(build_state(tenant_name, reactions));
@@ -338,7 +338,7 @@ kind = "entity"
 guard = "!(status == 'Confirmed')"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 "#;
     let tenant_name = "shop-e2e-3";
     let state = Arc::new(build_state(tenant_name, reactions));
@@ -381,7 +381,7 @@ resolve_target = { type = "same_id" }
 }
 
 // =========================================================================
-// E2E-4: params_from — dynamic params pipe through production dispatch
+// E2E-4: field args — dynamic params pipe through production dispatch
 // without breaking the cascade when source field is missing.
 //
 // Proves build_effective_params (shared helper between prod and sim) is
@@ -390,17 +390,19 @@ resolve_target = { type = "same_id" }
 // =========================================================================
 
 #[tokio::test(flavor = "multi_thread")]
-async fn prod_dispatcher_params_from_missing_field_still_fires() {
+async fn prod_dispatcher_field_arg_missing_field_still_fires() {
     let reactions = r#"
+params = ["reason"]
+
 [[action.triggers]]
-name = "order_confirmed_with_params_from"
+name = "order_confirmed_with_field_arg"
 kind = "entity"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-# Reference a field Order.ConfirmOrder never produces.
-params = { note = "from_reaction" }
-params_from = { passed_field = "nonexistent" }
-resolve_target = { type = "same_id" }
+# `reason` is a ConfirmOrder parameter the test never passes, so the field
+# is absent when the trigger reads it.
+args = { note = "'from_reaction'", passed_field = "reason" }
+resolve_target = { kind = "same_id" }
 "#;
     let tenant_name = "shop-e2e-4";
     let state = Arc::new(build_state(tenant_name, reactions));

@@ -9,6 +9,7 @@ use serde_json::Value as Json;
 
 /// A single cross-field validation rule on one entity, checked on writes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FieldInvariant {
     /// Invariant name (used in error bodies and logs).
     pub name: String,

@@ -222,7 +222,7 @@ name = "forward_to_sink"
 kind = "entity"
 target_entity = "Sink"
 target_action = "Replace"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 "#;
         let source = SpecDrivenActor::from_ioa(source_spec).unwrap();
         let sink = SpecDrivenActor::from_ioa(&SPEC.replace("Strict", "Sink")).unwrap();

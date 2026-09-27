@@ -46,7 +46,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "payment_id"
@@ -81,8 +81,8 @@ target_entity = "Payment"
 target_action = "AuthorizePayment"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "payment_id"
+kind = "field"
+id_field = "payment_id"
 "#;
 
 const PAYMENT_IOA: &str = r#"
@@ -136,7 +136,7 @@ initial = ""
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "StreamUpdated"
@@ -152,12 +152,12 @@ principal = "file-service"
 target_entity = "Workspace"
 target_action = "IncrementUsage"
 
-[action.triggers.params_from]
+[action.triggers.args]
 size_bytes = "size_bytes"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#;
 
 const WORKSPACE_IOA: &str = r#"
@@ -169,7 +169,7 @@ initial = "Active"
 [[state]]
 name = "used_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "IncrementUsage"
@@ -353,7 +353,7 @@ async fn a_tenant_past_the_advisory_threshold_boots_and_still_fires_its_trigger(
         format!("{ORDER_IOA}\n[[action]]\nname = \"Poke\"\nkind = \"input\"\nfrom = [\"Draft\"]\n");
     for i in 0..MAX_REACTIONS_PER_TENANT + 9 {
         order.push_str(&format!(
-            "\n[[action.triggers]]\nname = \"filler_{i}\"\nkind = \"entity\"\ntarget_entity = \"Payment\"\ntarget_action = \"AuthorizePayment\"\nresolve_target = {{ type = \"same_id\" }}\n"
+            "\n[[action.triggers]]\nname = \"filler_{i}\"\nkind = \"entity\"\ntarget_entity = \"Payment\"\ntarget_action = \"AuthorizePayment\"\nresolve_target = {{ kind = \"same_id\" }}\n"
         ));
     }
 

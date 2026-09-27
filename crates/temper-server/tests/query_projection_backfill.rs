@@ -25,7 +25,7 @@ initial = ""
 [[state]]
 name = "progress_token"
 type = "counter"
-initial = "0"
+initial = 0
 query_indexed = false
 
 [[action]]

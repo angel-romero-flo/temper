@@ -8,7 +8,7 @@ terminal = ["Started", "Failed", "Cancelled"]
 [[state]]
 name = "has_contract"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "SubmitEpisodeStartRequest"

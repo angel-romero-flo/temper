@@ -7,32 +7,32 @@ terminal = ["Complete", "Failed"]
 [[state]]
 name = "signal_summary_present"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "analysis_present"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "proposal_present"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "finding_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "records_created_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "issues_created_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Trigger"
