@@ -40,5 +40,6 @@ for name in ("runtime.env", "observe.htpasswd"):
     tl("sbx", "cp", str(a.credentials_dir / name), a.name + ":/etc/temper/" + name)
 print(tl("sbx", "exec", a.name, "sh", "-c", "chmod 600 /etc/temper/runtime.env; chmod 644 /etc/temper/observe.htpasswd"), flush=True)
 print(tl("sbx", "exec", "--detach", "--name", "temper", "--restart", "on-failure", "--max-restarts", "5", a.name, "/opt/temper/start.sh"), flush=True)
+print(tl("sbx", "exec", a.name, "python3", "-c", Path(__file__).with_name("bootstrap.py").read_text()), flush=True)
 print("Verify health and authorization before exposing ports 3000 and 8080.")
 print("Credentials saved privately to " + str(a.credentials_dir))
