@@ -21,7 +21,7 @@ trap cleanup EXIT TERM INT
 # Kernel timers are outside this deployment's supported contract; no wakeup service.
 temper serve --storage turso --port 3000 &
 pids+=("$!")
-node /opt/temper/observe/server.js &
+HOSTNAME=127.0.0.1 node /opt/temper/observe/server.js &
 pids+=("$!")
 nginx -g 'daemon off;' &
 pids+=("$!")
