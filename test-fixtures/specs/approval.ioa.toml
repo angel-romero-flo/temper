@@ -15,12 +15,12 @@ terminal = ["Withdrawn"]
 [[state]]
 name = "approvals"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_reviewer"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions: Approval Lifecycle ---
 

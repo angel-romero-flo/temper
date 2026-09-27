@@ -592,15 +592,15 @@ initial = ""
 [[state]]
 name = "revision"
 type = "counter"
-initial = "3"
+initial = 3
 [[state]]
 name = "enabled"
 type = "bool"
-initial = "true"
+initial = true
 [[state]]
 name = "members"
 type = "list"
-initial = '["first"]'
+initial = ["first"]
 "#
     } else {
         log_entry_ioa.to_string()

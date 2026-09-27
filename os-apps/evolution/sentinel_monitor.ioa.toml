@@ -17,27 +17,27 @@ initial = "Active"
 [[state]]
 name = "check_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "alert_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "evolution_runs_created"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_alerts"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "check_interval_seconds"
 type = "counter"
-initial = "300"
+initial = 300
 
 # --- Actions ---
 

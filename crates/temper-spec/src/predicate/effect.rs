@@ -25,7 +25,8 @@ use super::parse::{ParseError, Parser, Tok};
 /// The value an effect writes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Arg {
-    /// A literal (never `null`).
+    /// A literal. `null` appears only in trigger and timeout `args`; effects
+    /// reject it.
     Lit(Literal),
     /// Another state variable of the same type.
     Var(String),
@@ -228,6 +229,7 @@ impl Parser<'_> {
             Some(Tok::Ident(name)) if name == "true" || name == "false" => {
                 Arg::Lit(Literal::Bool(name == "true"))
             }
+            Some(Tok::Ident(name)) if name == "null" => Arg::Lit(Literal::Null),
             Some(Tok::Ident(name)) if name == "params" => {
                 self.pos += 1;
                 self.expect(&Tok::Dot, "'.' after 'params'")?;

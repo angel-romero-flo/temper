@@ -1,5 +1,7 @@
 # ADR-0049: First-Class State-Entry Timeouts and Durable Scheduler
 
+> **Key name superseded by [ADR-0181](0181-strict-typed-spec-reading.md):** a timeout's `params` is now `args`, whose values are literals (`'text'`) or state variables, read when the timer is armed.
+
 - Status: Proposed
 - Date: 2026-04-17
 - Deciders: Temper core maintainers

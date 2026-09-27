@@ -27,7 +27,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AddItem"

@@ -2,8 +2,8 @@
 //! `{ type = "min_count", ... }` tables and arrays of either.
 
 use super::syntax::Guard;
+use super::{scalar_string, unsigned};
 use crate::automaton::parser::AutomatonParseError;
-use crate::automaton::toml_parser::values::{scalar_string, unsigned};
 use toml::{Table, Value};
 
 /// Parse an action `guard` value: one string clause, or an array whose

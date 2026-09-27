@@ -83,7 +83,7 @@ impl EntityActorHandler {
         let kinds: std::collections::BTreeMap<String, VarKind> = automaton
             .state
             .iter()
-            .map(|sv| (sv.name.clone(), VarKind::from_type(&sv.var_type)))
+            .map(|sv| (sv.name.clone(), sv.var_type.kind()))
             .collect();
         // Check what the verification cascade checks; invariants over values
         // it cannot model are reported there as unverifiable.

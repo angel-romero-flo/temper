@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 
 use toml_edit::{ArrayOfTables, DocumentMut, InlineTable, Item, Table, value};
 
+use super::any_string;
 use super::effects::{Effect as Old, parse_effect_value};
 use super::migrate::to_toml;
-use crate::automaton::toml_parser::values::any_string;
 use crate::predicate::{VarKind, parse_effect};
 
 /// A `[[integration]]` block.

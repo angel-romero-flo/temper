@@ -72,14 +72,12 @@ pub async fn handle_webhook(
         );
     }
 
-    // Extract entity ID from the configured source.
-    let entity_id = {
-        let param_name = webhook.entity_param.as_deref().unwrap_or("entity_id");
-        query.get(param_name).cloned()
-    };
+    // Extract entity ID from the configured source (`query.<name>`, checked
+    // when the spec loads).
+    let entity_id = extract_param(&webhook.entity_id, &query);
 
     let Some(entity_id) = entity_id else {
-        let param_name = webhook.entity_param.as_deref().unwrap_or("entity_id");
+        let param_name = Webhook::query_param(&webhook.entity_id).unwrap_or_default();
         tracing::warn!(param = %param_name, "missing entity ID in webhook request");
         return (
             StatusCode::BAD_REQUEST,
@@ -274,16 +272,9 @@ fn find_webhook(state: &ServerState, tenant: &TenantId, path: &str) -> Option<(S
     None
 }
 
-/// Extract a parameter value from the configured source.
-///
-/// Supported source formats:
-/// - `query.KEY` — extract from URL query string
+/// Read a `query.<name>` source from the URL query string.
 fn extract_param(source: &str, query: &BTreeMap<String, String>) -> Option<String> {
-    if let Some(key) = source.strip_prefix("query.") {
-        return query.get(key).cloned();
-    }
-    // Bare key — also try query string.
-    query.get(source).cloned()
+    query.get(Webhook::query_param(source)?).cloned()
 }
 
 #[cfg(test)]

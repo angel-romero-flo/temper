@@ -28,7 +28,7 @@ initial = "Active"
 [[state]]
 name = "generation"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions ---
 

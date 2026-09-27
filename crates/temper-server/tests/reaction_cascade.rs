@@ -59,14 +59,12 @@ fn ecommerce_registry() -> ReactionRegistry {
             when: ReactionTrigger {
                 entity_type: "Order".to_string(),
                 action: Some("ConfirmOrder".to_string()),
-                to_state: Some("Confirmed".to_string()),
-                guard: None,
+                guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "AuthorizePayment".to_string(),
-                params: serde_json::json!({}),
-                params_from: std::collections::BTreeMap::new(),
+                args: std::collections::BTreeMap::new(),
             },
             resolve_target: TargetResolver::SameId,
             principal: None,
@@ -150,14 +148,12 @@ fn a_rule_past_the_advisory_threshold_still_dispatches() {
                 // Inert: these never match the Order flow driven below.
                 entity_type: format!("Filler{i}"),
                 action: Some("Poke".to_string()),
-                to_state: None,
                 guard: None,
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "FailPayment".to_string(),
-                params: serde_json::json!({}),
-                params_from: std::collections::BTreeMap::new(),
+                args: std::collections::BTreeMap::new(),
             },
             resolve_target: TargetResolver::SameId,
             principal: None,
@@ -171,14 +167,12 @@ fn a_rule_past_the_advisory_threshold_still_dispatches() {
         when: ReactionTrigger {
             entity_type: "Order".to_string(),
             action: Some("ConfirmOrder".to_string()),
-            to_state: Some("Confirmed".to_string()),
-            guard: None,
+            guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
         },
         then: ReactionTarget {
             entity_type: "Payment".to_string(),
             action: "AuthorizePayment".to_string(),
-            params: serde_json::json!({}),
-            params_from: std::collections::BTreeMap::new(),
+            args: std::collections::BTreeMap::new(),
         },
         resolve_target: TargetResolver::SameId,
         principal: None,
@@ -279,14 +273,12 @@ fn field_based_target_resolution() {
             when: ReactionTrigger {
                 entity_type: "Order".to_string(),
                 action: Some("ConfirmOrder".to_string()),
-                to_state: Some("Confirmed".to_string()),
-                guard: None,
+                guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "AuthorizePayment".to_string(),
-                params: serde_json::json!({}),
-                params_from: std::collections::BTreeMap::new(),
+                args: std::collections::BTreeMap::new(),
             },
             resolve_target: TargetResolver::Field {
                 field: "payment_id".to_string(),
@@ -341,14 +333,12 @@ fn multi_step_cascade_with_chained_reactions() {
                 when: ReactionTrigger {
                     entity_type: "Order".to_string(),
                     action: Some("ConfirmOrder".to_string()),
-                    to_state: Some("Confirmed".to_string()),
-                    guard: None,
+                    guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
                 },
                 then: ReactionTarget {
                     entity_type: "Payment".to_string(),
                     action: "AuthorizePayment".to_string(),
-                    params: serde_json::json!({}),
-                    params_from: std::collections::BTreeMap::new(),
+                    args: std::collections::BTreeMap::new(),
                 },
                 resolve_target: TargetResolver::SameId,
                 principal: None,
@@ -358,14 +348,12 @@ fn multi_step_cascade_with_chained_reactions() {
                 when: ReactionTrigger {
                     entity_type: "Payment".to_string(),
                     action: Some("AuthorizePayment".to_string()),
-                    to_state: Some("Authorized".to_string()),
-                    guard: None,
+                    guard: Some(temper_spec::predicate::parse("status == 'Authorized'").unwrap()),
                 },
                 then: ReactionTarget {
                     entity_type: "Payment".to_string(),
                     action: "CapturePayment".to_string(),
-                    params: serde_json::json!({}),
-                    params_from: std::collections::BTreeMap::new(),
+                    args: std::collections::BTreeMap::new(),
                 },
                 resolve_target: TargetResolver::SameId,
                 principal: None,
@@ -403,14 +391,21 @@ fn multi_step_cascade_with_chained_reactions() {
 // =========================================================================
 
 #[test]
-fn cascade_with_params_from_fires_even_when_source_fields_missing() {
+fn cascade_with_field_args_fires_even_when_source_fields_missing() {
     let (_guard, clock, _id_gen) = install_deterministic_context(42);
 
     let mut reg = ReactionRegistry::new();
-    let mut params_from = std::collections::BTreeMap::new();
+    let mut args = std::collections::BTreeMap::new();
     // Reference a field that ConfirmOrder doesn't produce — the dispatcher
     // should log a warning and skip the key, not fail the reaction.
-    params_from.insert("dynamic_key".to_string(), "missing_field".to_string());
+    args.insert(
+        "dynamic_key".to_string(),
+        temper_spec::predicate::parse_arg("missing_field").unwrap(),
+    );
+    args.insert(
+        "static_key".to_string(),
+        temper_spec::predicate::parse_arg("'static_value'").unwrap(),
+    );
     reg.register_tenant_rules(
         "shop-pf",
         vec![ReactionRule {
@@ -418,14 +413,12 @@ fn cascade_with_params_from_fires_even_when_source_fields_missing() {
             when: ReactionTrigger {
                 entity_type: "Order".to_string(),
                 action: Some("ConfirmOrder".to_string()),
-                to_state: Some("Confirmed".to_string()),
-                guard: None,
+                guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "AuthorizePayment".to_string(),
-                params: serde_json::json!({"static_key": "static_value"}),
-                params_from,
+                args,
             },
             resolve_target: TargetResolver::SameId,
             principal: None,
@@ -471,14 +464,12 @@ fn guard_passing_rule_fires_guard_failing_rule_skipped() {
                 when: ReactionTrigger {
                     entity_type: "Order".to_string(),
                     action: Some("ConfirmOrder".to_string()),
-                    to_state: None,
                     guard: Some(temper_spec::predicate::parse("status == 'Confirmed'").unwrap()),
                 },
                 then: ReactionTarget {
                     entity_type: "Payment".to_string(),
                     action: "AuthorizePayment".to_string(),
-                    params: serde_json::json!({}),
-                    params_from: std::collections::BTreeMap::new(),
+                    args: std::collections::BTreeMap::new(),
                 },
                 resolve_target: TargetResolver::SameId,
                 principal: None,
@@ -488,14 +479,12 @@ fn guard_passing_rule_fires_guard_failing_rule_skipped() {
                 when: ReactionTrigger {
                     entity_type: "Order".to_string(),
                     action: Some("ConfirmOrder".to_string()),
-                    to_state: None,
                     guard: Some(temper_spec::predicate::parse("status == 'Cancelled'").unwrap()),
                 },
                 then: ReactionTarget {
                     entity_type: "Payment".to_string(),
                     action: "FailPayment".to_string(),
-                    params: serde_json::json!({}),
-                    params_from: std::collections::BTreeMap::new(),
+                    args: std::collections::BTreeMap::new(),
                 },
                 resolve_target: TargetResolver::SameId,
                 principal: None,
@@ -537,14 +526,12 @@ fn not_guard_skips_rule_when_inner_passes() {
             when: ReactionTrigger {
                 entity_type: "Order".to_string(),
                 action: Some("ConfirmOrder".to_string()),
-                to_state: None,
                 guard: Some(temper_spec::predicate::parse("!(status == 'Confirmed')").unwrap()),
             },
             then: ReactionTarget {
                 entity_type: "Payment".to_string(),
                 action: "AuthorizePayment".to_string(),
-                params: serde_json::json!({}),
-                params_from: std::collections::BTreeMap::new(),
+                args: std::collections::BTreeMap::new(),
             },
             resolve_target: TargetResolver::SameId,
             principal: None,
@@ -631,16 +618,14 @@ field = "expected"
             when: ReactionTrigger {
                 entity_type: source.into(),
                 action: Some("Record".into()),
-                to_state: None,
                 guard: None,
             },
             then: ReactionTarget {
                 entity_type: target.into(),
                 action: "Record".into(),
-                params: serde_json::json!({}),
-                params_from: mapping
+                args: mapping
                     .into_iter()
-                    .map(|(a, b)| (a.into(), b.into()))
+                    .map(|(a, b)| (a.into(), temper_spec::predicate::parse_arg(b).unwrap()))
                     .collect(),
             },
             resolve_target: TargetResolver::Field {

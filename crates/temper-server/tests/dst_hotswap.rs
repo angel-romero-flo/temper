@@ -20,7 +20,7 @@ states = ["Draft", "Submitted", "Confirmed", "Processing", "Shipped", "Delivered
 [[state]]
 name = "item_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "AddItem"

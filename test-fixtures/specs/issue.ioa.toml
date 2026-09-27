@@ -15,12 +15,12 @@ terminal = ["Archived"]
 [[state]]
 name = "assignee_set"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "review_cycles"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions: Issue Lifecycle ---
 

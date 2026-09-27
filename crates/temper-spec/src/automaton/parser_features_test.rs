@@ -11,12 +11,12 @@ initial = "Open"
 [[state]]
 name = "is_done"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "attempt_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Complete"
@@ -44,12 +44,12 @@ initial = "Open"
 [[state]]
 name = "retries"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "labels"
 type = "list"
-initial = "[]"
+initial = []
 
 [[action]]
 name = "Queue"
@@ -104,7 +104,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "SubmitOrder"
@@ -170,7 +170,7 @@ initial = "Pending"
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Complete"

@@ -7,7 +7,7 @@ allow_indefinite_states = ["Queued", "Claimed", "Running"]
 [[state]]
 name = "claimed"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "QueueWorkItem"

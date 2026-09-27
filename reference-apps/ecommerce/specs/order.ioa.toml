@@ -15,12 +15,12 @@ terminal = ["Cancelled", "Refunded"]
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_address"
 type = "bool"
-initial = "false"
+initial = false
 
 # Tracks whether the ConfirmOrder step has captured payment. Required
 # by the ShipRequiresPayment invariant: only orders with payment
@@ -28,7 +28,7 @@ initial = "false"
 [[state]]
 name = "payment_captured"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions: Order Lifecycle ---
 

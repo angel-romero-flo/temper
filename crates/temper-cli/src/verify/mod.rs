@@ -451,8 +451,8 @@ target_entity = "Workspace"
 target_action = "IncrementUsage"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "workspace_id"
+kind = "field"
+id_field = "workspace_id"
 "#;
         let workspace = r#"
 [automaton]

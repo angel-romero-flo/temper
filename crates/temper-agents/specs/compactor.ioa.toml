@@ -9,7 +9,7 @@ initial = "Idle"
 [[state]]
 name = "compactions_done"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "CompactionNeeded"
@@ -22,7 +22,7 @@ name = "compaction_run_trigger"
 kind = "entity"
 target_entity = "CompactionIntegration"
 target_action = "run_compaction"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "CompactionComplete"
@@ -36,7 +36,7 @@ name = "compaction_complete_to_agent"
 kind = "entity"
 target_entity = "Process"
 target_action = "CompactionComplete"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "CompactionFailed"
@@ -49,4 +49,4 @@ name = "compaction_failed_to_agent"
 kind = "entity"
 target_entity = "Process"
 target_action = "CompactionFailed"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }

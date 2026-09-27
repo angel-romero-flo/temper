@@ -1012,7 +1012,7 @@ async fn test_get_spec_detail_found() {
 
 #[test]
 fn action_param_detail_serializes_typed_params_under_type_key() {
-    // Typed params (e.g. `{ name = "sleep_seconds", type = "uint64" }` in a
+    // Typed params (e.g. `{ name = "sleep_seconds", type = "counter" }` in a
     // spec) reach ActionParamDetail through ActionParam::name()/param_type();
     // this locks the wire shape those values serialize into.
     let detail = ActionParamDetail {

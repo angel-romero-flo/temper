@@ -35,22 +35,22 @@ initial = "0"
 [[state]]
 name = "duration_ms"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "budget_approved"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "has_result"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "turn_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "max_turns"
@@ -75,7 +75,7 @@ initial = "claude_code"
 [[state]]
 name = "agent_bound"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions ---
 

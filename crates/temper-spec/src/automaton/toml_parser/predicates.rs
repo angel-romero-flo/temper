@@ -6,13 +6,9 @@ use super::super::field_invariant::FieldInvariant;
 use super::super::legacy;
 use super::super::parser::AutomatonParseError;
 use super::super::types::{ActionTrigger, Invariant};
-use super::values::string;
+use super::{MIGRATE_HINT, RESOLVER_RETIRED, TRIGGER_RETIRED, entries, retired, typed};
 use crate::predicate::{self, Expr};
 use toml::{Table, Value};
-
-/// Appended to errors for specs still written in the old predicate syntax.
-const MIGRATE_HINT: &str =
-    "this is the old predicate syntax; convert the spec with `temper migrate-predicates`";
 
 fn invalid(slot: &str, message: impl std::fmt::Display) -> AutomatonParseError {
     AutomatonParseError::Validation(format!("{slot}: {message}"))
@@ -23,12 +19,17 @@ fn expression(slot: &str, value: &Value, legacy: bool) -> Result<Expr, Automaton
     let Value::String(source) = value else {
         return Err(invalid(
             slot,
-            format!("must be an expression string; {MIGRATE_HINT}"),
+            format!(
+                "must be an expression string; this is the old predicate syntax; {MIGRATE_HINT}"
+            ),
         ));
     };
     predicate::parse(source).map_err(|e| {
         if legacy {
-            invalid(slot, format!("{e}; {MIGRATE_HINT}"))
+            invalid(
+                slot,
+                format!("{e}; this is the old predicate syntax; {MIGRATE_HINT}"),
+            )
         } else {
             invalid(slot, e)
         }
@@ -44,104 +45,107 @@ pub(super) fn action_guard(action: &str, value: &Value) -> Result<Expr, Automato
     )
 }
 
-/// Every `[[invariant]]`.
+/// Every `[[invariant]]`: a `name` and an `assert`.
 pub(super) fn invariants(doc: &Table) -> Result<Vec<Invariant>, AutomatonParseError> {
-    let Some(value) = doc.get("invariant") else {
-        return Ok(Vec::new());
-    };
-    let Value::Array(entries) = value else {
-        return Err(AutomatonParseError::Toml(
-            "'invariant' must be written as [[invariant]]".into(),
+    entries(doc, "invariant", "name", invariant)
+}
+
+fn invariant(slot: &str, table: &Table) -> Result<Invariant, AutomatonParseError> {
+    if table.contains_key("when") {
+        return Err(invalid(
+            slot,
+            format!("`when` is not a key; this is the old predicate syntax; {MIGRATE_HINT}"),
         ));
-    };
-    let mut invariants = Vec::with_capacity(entries.len());
-    for entry in entries {
-        let Value::Table(table) = entry else {
-            return Err(AutomatonParseError::Toml(
-                "'invariant' must be written as [[invariant]]".into(),
-            ));
-        };
-        let name = string(table, "invariant", "name")?.unwrap_or_default();
-        if name.is_empty() {
-            continue;
-        }
-        let slot = format!("invariant '{name}'");
-        if table.contains_key("when") {
-            return Err(invalid(
-                &slot,
-                format!("`when` is not a key; {MIGRATE_HINT}"),
-            ));
-        }
-        let value = table
-            .get("assert")
-            .ok_or_else(|| invalid(&slot, "missing `assert`"))?;
-        if let Some(text) = value.as_str()
-            && matches!(
-                legacy::invariant_to_expr(&[], text),
-                Ok(legacy::LoweredInvariant::Terminal(_) | legacy::LoweredInvariant::Dropped(_))
-            )
-        {
-            return Err(invalid(
-                &slot,
-                format!(
-                    "`{text}` is not an invariant; terminal states go in `[automaton] terminal`; {MIGRATE_HINT}"
-                ),
-            ));
-        }
-        let legacy = value.as_str().is_some_and(|text| {
-            predicate::parse(text).is_err() && legacy::invariant_to_expr(&[], text).is_ok()
-        });
-        let assert = expression(&slot, value, legacy)?;
-        invariants.push(Invariant { name, assert });
     }
-    Ok(invariants)
+    if let Some(key) = table
+        .keys()
+        .find(|key| !matches!(key.as_str(), "name" | "assert"))
+    {
+        return Err(invalid(
+            slot,
+            format!("unknown field `{key}`, expected `name` or `assert`"),
+        ));
+    }
+    let name = table
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let value = table
+        .get("assert")
+        .ok_or_else(|| invalid(slot, "missing `assert`"))?;
+    if let Some(text) = value.as_str()
+        && matches!(
+            legacy::invariant_to_expr(&[], text),
+            Ok(legacy::LoweredInvariant::Terminal(_) | legacy::LoweredInvariant::Dropped(_))
+        )
+    {
+        return Err(invalid(
+            slot,
+            format!(
+                "`{text}` is not an invariant; terminal states go in `[automaton] terminal`; this is the old predicate syntax; {MIGRATE_HINT}"
+            ),
+        ));
+    }
+    let legacy = value.as_str().is_some_and(|text| {
+        predicate::parse(text).is_err() && legacy::invariant_to_expr(&[], text).is_ok()
+    });
+    let assert = expression(slot, value, legacy)?;
+    Ok(Invariant {
+        name: name.to_string(),
+        assert,
+    })
 }
 
 /// Every `[[field_invariant]]`.
 pub(super) fn field_invariants(doc: &Table) -> Result<Vec<FieldInvariant>, AutomatonParseError> {
-    let Some(Value::Array(entries)) = doc.get("field_invariant") else {
-        return Ok(Vec::new());
-    };
-    let mut out = Vec::with_capacity(entries.len());
-    for entry in entries {
-        if entry.get("when").is_some() || entry.get("require").is_some() {
-            let name = entry.get("name").and_then(Value::as_str).unwrap_or("?");
+    entries(doc, "field_invariant", "name", |slot, table| {
+        if table.contains_key("when") || table.contains_key("require") {
             return Err(invalid(
-                &format!("field_invariant '{name}'"),
-                format!("`when`/`require` are not keys, write one `assert`; {MIGRATE_HINT}"),
+                slot,
+                format!(
+                    "`when`/`require` are not keys, write one `assert`; this is the old predicate syntax; {MIGRATE_HINT}"
+                ),
             ));
         }
-        out.push(entry.clone().try_into().map_err(|e: toml::de::Error| {
-            AutomatonParseError::Toml(format!("field_invariant: {e}"))
-        })?);
-    }
-    Ok(out)
+        typed(Value::Table(table.clone()), slot)
+    })
 }
 
-/// An action's `[[action.triggers]]`.
-pub(super) fn triggers(action: &Table) -> Result<Vec<ActionTrigger>, AutomatonParseError> {
-    let Some(value) = action.get("triggers") else {
-        return Ok(Vec::new());
-    };
+/// An action's `[[action.triggers]]`; `action` names the action in errors.
+pub(super) fn triggers(
+    action: &str,
+    value: &Value,
+) -> Result<Vec<ActionTrigger>, AutomatonParseError> {
     let Value::Array(entries) = value else {
-        return Err(AutomatonParseError::Toml(
-            "action metadata: 'triggers' must be written as [[action.triggers]]".into(),
-        ));
+        return Err(AutomatonParseError::Toml(format!(
+            "{action}: 'triggers' must be written as [[action.triggers]]"
+        )));
     };
     let mut out = Vec::with_capacity(entries.len());
     for entry in entries {
+        let name = entry.get("name").and_then(Value::as_str).unwrap_or("?");
+        let slot = format!("{action} trigger '{name}'");
         if let Some(guard) = entry.get("guard")
             && !guard.is_str()
         {
-            let name = entry.get("name").and_then(Value::as_str).unwrap_or("?");
             return Err(invalid(
-                &format!("trigger '{name}' guard"),
-                format!("must be an expression string; {MIGRATE_HINT}"),
+                &format!("{slot} guard"),
+                format!(
+                    "must be an expression string; this is the old predicate syntax; {MIGRATE_HINT}"
+                ),
             ));
         }
-        out.push(entry.clone().try_into().map_err(|e: toml::de::Error| {
-            AutomatonParseError::Toml(format!("action metadata: {e}"))
-        })?);
+        if let Value::Table(table) = entry {
+            retired(&slot, table, TRIGGER_RETIRED)?;
+            if let Some(Value::Table(resolver)) = table.get("resolve_target") {
+                retired(
+                    &format!("{slot} resolve_target"),
+                    resolver,
+                    RESOLVER_RETIRED,
+                )?;
+            }
+        }
+        out.push(typed(entry.clone(), &slot)?);
     }
     Ok(out)
 }

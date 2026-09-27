@@ -36,7 +36,7 @@ initial = "Draft"
 [[state]]
 name = "task_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Activate"
@@ -107,12 +107,12 @@ initial = "Active"
 [[state]]
 name = "used"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "quota"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "SetQuota"
@@ -175,12 +175,12 @@ initial = "Active"
 [[state]]
 name = "used"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "quota"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "SetQuota"
@@ -215,7 +215,7 @@ initial = "Open"
 [[state]]
 name = "tags"
 type = "list"
-initial = "[]"
+initial = []
 
 [[action]]
 name = "Tag"

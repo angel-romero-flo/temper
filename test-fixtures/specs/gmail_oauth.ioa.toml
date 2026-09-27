@@ -70,8 +70,7 @@ name = "oauth_callback"
 path = "oauth/callback"
 method = "GET"
 action = "OAuthCallback"
-entity_lookup = "query_param"
-entity_param = "state"
+entity_id = "query.state"
 
 [webhook.extract]
 code = "query.code"

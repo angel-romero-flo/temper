@@ -35,7 +35,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Submit"
@@ -59,22 +59,22 @@ initial = "Draft"
 [[state]]
 name = "count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "limit"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "done"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "tags"
 type = "list"
-initial = "[]"
+initial = []
 "#;
 
 fn effects_of(action: &str) -> Vec<ResolvedEffect> {
@@ -166,7 +166,7 @@ name = "notify_child"
 kind = "entity"
 target_entity = "Child"
 target_action = "Init"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "Refresh"

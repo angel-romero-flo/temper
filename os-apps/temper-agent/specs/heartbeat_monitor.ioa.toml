@@ -21,7 +21,7 @@ initial = ""
 [[state]]
 name = "stale_agents_found"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Start"

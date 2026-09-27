@@ -13,22 +13,22 @@ terminal = ["Archived"]
 [[state]]
 name = "issue_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_description"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "cycle_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "member_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions ---
 

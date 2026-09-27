@@ -344,7 +344,7 @@ mod tests {
     const TEST_CSDL: &str = include_str!("../../../../test-fixtures/specs/model.csdl.xml");
 
     #[test]
-    fn lint_tenant_specs_flags_unknown_variables() {
+    fn lint_tenant_specs_rejects_unknown_state_types() {
         let csdl = parse_csdl(TEST_CSDL).expect("CSDL should parse");
         let mut ioa_sources = HashMap::new();
         ioa_sources.insert(
@@ -358,7 +358,7 @@ initial = "Draft"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "mood"
@@ -373,12 +373,8 @@ to = "Done"
             .to_string(),
         );
 
-        let findings = lint_tenant_specs(&csdl, &ioa_sources).expect("lint should run");
-        assert!(
-            findings
-                .iter()
-                .any(|f| f.code == "unknown_state_var_type" && f.severity == LintSeverity::Error)
-        );
+        let error = lint_tenant_specs(&csdl, &ioa_sources).expect_err("unknown type");
+        assert!(format!("{error:#}").contains("emotion"), "{error:#}");
     }
 
     #[test]
@@ -394,15 +390,18 @@ name = "Order"
 states = ["Draft", "Done"]
 initial = "Draft"
 
-[[state]]
-name = "mood"
-type = "emotion"
-initial = "calm"
-
 [[action]]
 name = "Complete"
 from = ["Draft"]
 to = "Done"
+
+[[field_invariant]]
+name = "Twice"
+assert = "true"
+
+[[field_invariant]]
+name = "Twice"
+assert = "true"
 "#,
         )
         .expect("write ioa");

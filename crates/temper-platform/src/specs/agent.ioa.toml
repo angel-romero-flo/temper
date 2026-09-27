@@ -60,7 +60,7 @@ initial = ""
 [[state]]
 name = "child_agent_ids"
 type = "list"
-initial = "[]"
+initial = []
 
 [[state]]
 name = "agent_type_id"

@@ -11,7 +11,7 @@ strict_action_params = true
 [[state]]
 name = "revision"
 type = "counter"
-initial = "1"
+initial = 1
 [[state]]
 name = "observed"
 type = "string"

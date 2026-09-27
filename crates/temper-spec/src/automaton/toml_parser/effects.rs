@@ -4,7 +4,7 @@ use super::AutomatonParseError;
 use crate::predicate::{Effect, parse_effect};
 use toml::Value;
 
-const MIGRATE_HINT: &str = "run `temper migrate-predicates` to convert the old effect syntax";
+use super::MIGRATE_HINT;
 
 /// Parse `effect = ["items += 1", "ready = true", ...]`.
 pub(super) fn parse_effects(
@@ -13,7 +13,7 @@ pub(super) fn parse_effects(
 ) -> Result<Vec<Effect>, AutomatonParseError> {
     let invalid = |detail: String| {
         let hint = if crate::automaton::legacy::is_legacy_effect(value) {
-            format!("; {MIGRATE_HINT}")
+            format!("; this is the old effect syntax; {MIGRATE_HINT}")
         } else {
             String::new()
         };

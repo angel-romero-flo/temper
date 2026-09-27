@@ -18,7 +18,7 @@ initial = ""
 [[state]]
 name = "version_number"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "content_hash"
@@ -33,7 +33,7 @@ initial = ""
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "previous_version_id"
@@ -63,12 +63,12 @@ principal = "file-service"
 target_entity = "File"
 target_action = "RecordVersion"
 
-[action.triggers.params_from]
+[action.triggers.args]
 last_version_id = "Id"
 
 [action.triggers.resolve_target]
-type = "field"
-field = "file_id"
+kind = "field"
+id_field = "file_id"
 
 [[action]]
 name = "Supersede"

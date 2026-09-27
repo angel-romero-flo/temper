@@ -14,7 +14,7 @@ terminal = ["Deleted"]
 [[state]]
 name = "edit_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "issue_id"

@@ -1,10 +1,10 @@
 use super::*;
 
 #[tokio::test]
-async fn typed_uint64_refuses_before_postgres_adapter_state_or_effects_change() {
+async fn typed_counter_refuses_before_postgres_adapter_state_or_effects_change() {
     let source = STRICT.replace(
         r#"params = ["desired", "expected_desired", "user_prompt"]"#,
-        r#"params = ["desired", "expected_desired", "user_prompt", {name="count",type="uint64"}]"#,
+        r#"params = ["desired", "expected_desired", "user_prompt", {name="count",type="counter"}]"#,
     );
     let actor = actor(&source);
     for raw in [false, true] {

@@ -93,7 +93,7 @@ async fn context_spawn_persists_strict_child_defaults_before_activation() {
     system.register(Arc::new(ChildSpawner)).await.unwrap();
     let spec = SPEC.replace(
         "[[action]]",
-        "[[state]]\nname = \"attempts\"\ntype = \"counter\"\ninitial = \"5\"\n[[action]]",
+        "[[state]]\nname = \"attempts\"\ntype = \"counter\"\ninitial = 5\n[[action]]",
     );
     system
         .register(Arc::new(SpecDrivenActor::from_ioa(&spec).unwrap()))

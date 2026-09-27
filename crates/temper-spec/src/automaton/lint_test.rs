@@ -3,7 +3,7 @@ use crate::automaton::parse_automaton;
 use std::collections::BTreeMap;
 
 #[test]
-fn lint_rejects_unknown_state_var_type() {
+fn unknown_state_var_types_fail_to_parse() {
     let src = r#"
 [automaton]
 name = "Task"
@@ -20,14 +20,8 @@ name = "Complete"
 from = ["Draft"]
 to = "Done"
 "#;
-    let automaton = parse_automaton(src).expect("parse");
-    let findings = lint_automaton(&automaton);
-    assert!(
-        findings
-            .iter()
-            .any(|finding| finding.code == "unknown_state_var_type"
-                && finding.severity == LintSeverity::Error)
-    );
+    let error = parse_automaton(src).expect_err("unknown type").to_string();
+    assert!(error.contains("mystery_type"), "{error}");
 }
 
 #[test]
@@ -41,7 +35,7 @@ initial = "Draft"
 [[state]]
 name = "approved"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "Complete"

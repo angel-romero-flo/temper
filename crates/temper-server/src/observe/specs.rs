@@ -121,7 +121,7 @@ pub(crate) async fn handle_get_spec_detail(
                     .iter()
                     .map(|a| ActionDetail {
                         name: a.name.clone(),
-                        kind: a.kind.clone(),
+                        kind: a.kind.as_str().to_string(),
                         from: a.from.clone(),
                         to: a.to.clone(),
                         guards: if a.guard.is_always() {
@@ -154,8 +154,11 @@ pub(crate) async fn handle_get_spec_detail(
                     .iter()
                     .map(|sv| StateVarDetail {
                         name: sv.name.clone(),
-                        var_type: sv.var_type.clone(),
-                        initial: sv.initial.clone(),
+                        var_type: sv.var_type.to_string(),
+                        initial: match &sv.initial {
+                            temper_spec::automaton::Initial::String(text) => text.clone(),
+                            other => other.to_string(),
+                        },
                         query_indexed: sv.query_indexed,
                     })
                     .collect(),

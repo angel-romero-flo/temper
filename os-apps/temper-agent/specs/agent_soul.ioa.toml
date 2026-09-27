@@ -28,7 +28,7 @@ initial = ""
 [[state]]
 name = "version"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "author_id"

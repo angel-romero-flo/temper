@@ -676,7 +676,7 @@ initial = "A"
 [[state]]
 name = "count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Go"
@@ -735,7 +735,7 @@ target_entity = "Payment"
 target_action = "AuthorizePayment"
 
 [action.triggers.resolve_target]
-type = "same_id"
+kind = "same_id"
 "#;
         let payment_spec = r#"
 [automaton]

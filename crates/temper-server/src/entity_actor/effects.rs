@@ -1652,7 +1652,7 @@ initial = "Pending"
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Complete"

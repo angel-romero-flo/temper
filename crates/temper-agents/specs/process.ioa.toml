@@ -11,26 +11,20 @@ states = [
 ]
 initial = "Created"
 
-[automaton.timeouts]
-BlockedInference = "120s"
-BlockedToolCall = "60s"
-BlockedCompaction = "30s"
-BlockedApproval = "3600s"
-
 [[state]]
 name = "turns"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "tool_call_rounds"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "child_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -54,7 +48,7 @@ name = "process_start_requests_context"
 kind = "entity"
 target_entity = "ContextManager"
 target_action = "PrepareContext"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "SendInput"
@@ -68,7 +62,7 @@ name = "process_start_requests_context"
 kind = "entity"
 target_entity = "ContextManager"
 target_action = "PrepareContext"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Context Preparation Results ─────────────────────────────────────────────
 
@@ -83,7 +77,7 @@ name = "llm_invoke_trigger"
 kind = "entity"
 target_entity = "LlmIntegration"
 target_action = "invoke_llm"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ContextOverflow"
@@ -96,7 +90,7 @@ name = "process_compaction_needed"
 kind = "entity"
 target_entity = "Compactor"
 target_action = "CompactionNeeded"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Inference Results ────────────────────────────────────────────────────────
 
@@ -112,7 +106,7 @@ name = "process_notify_parent"
 kind = "entity"
 target_entity = "ChildCompletionIntegration"
 target_action = "notify_parent_completion"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "InferenceCompleteToolCalls"
@@ -126,7 +120,7 @@ name = "process_tool_calls_to_router"
 kind = "entity"
 target_entity = "ToolRouter"
 target_action = "ToolCallBatchRequested"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "InferenceContextOverflow"
@@ -139,7 +133,7 @@ name = "process_compaction_needed"
 kind = "entity"
 target_entity = "Compactor"
 target_action = "CompactionNeeded"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "InferenceFailed"
@@ -161,7 +155,7 @@ name = "llm_invoke_trigger"
 kind = "entity"
 target_entity = "LlmIntegration"
 target_action = "invoke_llm"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ToolCallBatchFailed"
@@ -174,7 +168,7 @@ name = "process_notify_parent"
 kind = "entity"
 target_entity = "ChildCompletionIntegration"
 target_action = "notify_parent_completion"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "ApprovalRequired"
@@ -193,7 +187,7 @@ name = "process_tool_calls_to_router"
 kind = "entity"
 target_entity = "ToolRouter"
 target_action = "ToolCallBatchRequested"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "DenyToolCall"
@@ -206,7 +200,7 @@ name = "llm_invoke_trigger"
 kind = "entity"
 target_entity = "LlmIntegration"
 target_action = "invoke_llm"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Compaction Results ───────────────────────────────────────────────────────
 
@@ -221,7 +215,7 @@ name = "process_start_requests_context"
 kind = "entity"
 target_entity = "ContextManager"
 target_action = "PrepareContext"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "CompactionFailed"
@@ -234,7 +228,7 @@ name = "process_notify_parent"
 kind = "entity"
 target_entity = "ChildCompletionIntegration"
 target_action = "notify_parent_completion"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Control ──────────────────────────────────────────────────────────────────
 
@@ -268,7 +262,7 @@ name = "process_notify_parent"
 kind = "entity"
 target_entity = "ChildCompletionIntegration"
 target_action = "notify_parent_completion"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Integrations ─────────────────────────────────────────────────────────────
 
@@ -288,7 +282,7 @@ name = "process_spawn_child"
 kind = "entity"
 target_entity = "ChildSpawnerIntegration"
 target_action = "spawn_child"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 [[action]]
 name = "BlockOnChild"
@@ -310,7 +304,7 @@ name = "llm_invoke_trigger"
 kind = "entity"
 target_entity = "LlmIntegration"
 target_action = "invoke_llm"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Sleep primitive ──────────────────────────────────────────────────────────
 
@@ -319,7 +313,7 @@ name = "SleepProcess"
 kind = "input"
 from = ["Ready"]
 to = "Ready"
-params = [{ name = "sleep_seconds", type = "uint64" }]
+params = [{ name = "sleep_seconds", type = "counter" }]
 hint = "Suspend execution for N seconds, then resume."
 
 [[action.triggers]]
@@ -327,7 +321,7 @@ name = "process_schedule_wakeup"
 kind = "entity"
 target_entity = "WakeupSchedulerIntegration"
 target_action = "schedule_wakeup"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Completion with parent notification ─────────────────────────────────────
 
@@ -343,6 +337,6 @@ name = "process_notify_parent"
 kind = "entity"
 target_entity = "ChildCompletionIntegration"
 target_action = "notify_parent_completion"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 
 # ─── Integrations for new primitives ─────────────────────────────────────────

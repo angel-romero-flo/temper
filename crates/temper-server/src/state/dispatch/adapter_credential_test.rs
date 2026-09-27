@@ -632,8 +632,8 @@ kind="entity"
 target_entity="StrictJob"
 target_action="Poll"
 [action.triggers.resolve_target]
-type="field"
-field="observed"
+kind="field"
+id_field="observed"
 [[action]]
 name = "Rollover""#,
     );

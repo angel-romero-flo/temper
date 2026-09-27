@@ -85,26 +85,24 @@ fn invalid_toml_is_rejected() {
 }
 
 #[test]
-fn lenient_core_values_are_accepted() {
-    let auto = parse_with(
-        r#"
-[[state]]
-name = "count"
-type = "counter"
-initial = 0
-query_indexed = "false"
-
-[[action]]
-name = "Finish"
-from = "Draft"
-record_parent_event = "false"
-"#,
-    )
-    .unwrap();
-    assert_eq!(auto.actions[0].from, vec!["Draft"]);
-    assert_eq!(auto.state[0].initial, "0");
-    assert_eq!(auto.state[0].query_indexed, Some(false));
-    assert!(!auto.actions[0].record_parent_event);
+fn core_values_are_read_in_their_toml_type() {
+    let counter = "[[state]]\nname = \"count\"\ntype = \"counter\"\n";
+    let action = "[[action]]\nname = \"Finish\"\nkind = \"composite\"\n";
+    for (source, key) in [
+        (format!("{counter}initial = \"0\"\n"), "initial"),
+        (
+            format!("{counter}initial = 0\nquery_indexed = \"false\"\n"),
+            "query_indexed",
+        ),
+        (format!("{action}from = \"Draft\"\n"), "from"),
+        (
+            format!("{action}record_parent_event = \"false\"\n"),
+            "record_parent_event",
+        ),
+    ] {
+        let error = parse_with(&source).unwrap_err().to_string();
+        assert!(error.contains(key), "{source}: {error}");
+    }
 }
 
 #[test]
@@ -181,7 +179,7 @@ initial = "Active"
 
 [[action]]
 name = "IngestPack"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 params = ["PackBytes"]
@@ -209,7 +207,7 @@ generated_from = "ref_updates"
         .find(|action| action.name == "IngestPack")
         .unwrap();
 
-    assert_eq!(action.kind, "Composite");
+    assert_eq!(action.kind, ActionKind::Composite);
     assert_eq!(
         action.cedar_gate.as_ref().map(|gate| gate.action.as_str()),
         Some("Repository::IngestPack")
@@ -244,7 +242,7 @@ state = "Provisioning"
 after_seconds = 180
 on_timeout = "TimeoutFail"
 reset_on = ["Heartbeat"]
-params = { error_message = "provisioning did not complete within 180s" }
+args = { error_message = "'provisioning did not complete within 180s'" }
 
 [[state_timeout]]
 state = "Running"
@@ -265,8 +263,8 @@ fn state_timeout_parses_all_fields() {
     assert_eq!(provisioning.max_occurrences, 1, "default should be 1");
     assert_eq!(provisioning.reset_on, vec!["Heartbeat".to_string()]);
     assert_eq!(
-        provisioning.params.get("error_message").map(|s| s.as_str()),
-        Some("provisioning did not complete within 180s")
+        provisioning.args["error_message"].to_string(),
+        "'provisioning did not complete within 180s'"
     );
 }
 
@@ -280,7 +278,7 @@ fn state_timeout_max_occurrences_override() {
         running.reset_on.is_empty(),
         "reset_on omitted should default to empty"
     );
-    assert!(running.params.is_empty());
+    assert!(running.args.is_empty());
 }
 
 #[test]
@@ -391,7 +389,7 @@ on_timeout = "X"
 
 #[test]
 fn old_predicate_syntax_fails_with_a_migration_hint() {
-    let header = "[automaton]\nname = \"T\"\nstates = [\"A\", \"B\"]\ninitial = \"A\"\n\n[[state]]\nname = \"ready\"\ntype = \"bool\"\ninitial = \"false\"\n";
+    let header = "[automaton]\nname = \"T\"\nstates = [\"A\", \"B\"]\ninitial = \"A\"\n\n[[state]]\nname = \"ready\"\ntype = \"bool\"\ninitial = false\n";
     for body in [
         "[[action]]\nname = \"Go\"\nfrom = [\"A\"]\nto = \"B\"\nguard = \"is_true ready\"\n",
         "[[action]]\nname = \"Go\"\nfrom = [\"A\"]\nto = \"B\"\nguard = [{ type = \"is_true\", var = \"ready\" }]\n",

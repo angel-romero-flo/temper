@@ -7,7 +7,7 @@ allow_indefinite_states = ["Recorded", "Parent", "Superseded"]
 [[state]]
 name = "is_parent"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "MarkOrganismVersionParent"

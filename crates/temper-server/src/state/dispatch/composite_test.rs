@@ -146,7 +146,7 @@ initial = "Active"
 
 [[action]]
 name = "CreateChild"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 params = ["Reason"]
@@ -163,7 +163,7 @@ generated_from = "app_metadata"
 
 [[action]]
 name = "IngestPack"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 record_parent_event = false
@@ -196,7 +196,7 @@ generated_from = "ref_updates"
 
 [[action]]
 name = "DeleteChild"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 params = ["ChildId"]
@@ -208,7 +208,7 @@ generated_from = "child"
 
 [[action]]
 name = "CreateChildWithoutParentEvent"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 record_parent_event = false
@@ -1826,7 +1826,7 @@ states=["Active"]
 initial="Active"
 [[action]]
 name="CreateChild"
-kind="Composite"
+kind = "composite"
 from=["Active"]
 params=[]
 [[action.sub_writes]]
@@ -1846,19 +1846,19 @@ initial="Draft"
 strict_action_params=true
 [[state]]
 name="revision"
-type="counter"
-initial="3"
+type = "counter"
+initial = 3
 [[state]]
 name="enabled"
-type="bool"
-initial="true"
+type = "bool"
+initial = true
 [[state]]
 name="members"
-type="list"
-initial='["first"]'
+type = "list"
+initial = ["first"]
 [[state]]
 name="Name"
-type="string"
+type = "string"
 initial="initial name"
 [[action]]
 name="Create"

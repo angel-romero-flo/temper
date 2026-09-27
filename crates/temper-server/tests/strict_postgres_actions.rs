@@ -32,7 +32,7 @@ name = "SubmitOrder"
 kind = "input"
 from = ["Draft"]
 to = "Submitted"
-params = ["Notes", "expected_notes", {name="count",type="uint64"}]
+params = ["Notes", "expected_notes", {name="count", type = "counter" }]
 [[action.constraints]]
 kind = "param_equals_field"
 param = "expected_notes"

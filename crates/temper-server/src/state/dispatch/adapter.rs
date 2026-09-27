@@ -321,7 +321,6 @@ impl crate::state::ServerState {
             .filter(|v| !v.is_empty())
             .map(str::to_string)
             .or_else(|| integration.config.get("adapter").cloned())
-            .or_else(|| integration.config.get("adapter_type").cloned())
             .ok_or_else(|| {
                 format!(
                     "adapter integration '{}' is missing required config key 'adapter'",

@@ -21,6 +21,6 @@ params = [
     { name = "process_id", type = "string" },
     { name = "role",       type = "string" },
     { name = "content",    type = "string" },
-    { name = "sequence",   type = "uint64" },
+    { name = "sequence", type = "counter" },
 ]
 hint = "Append a message to the conversation."

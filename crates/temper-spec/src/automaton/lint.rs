@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{Automaton, Effect, FieldInvariant};
+use super::{ActionKind, Automaton, Effect, FieldInvariant};
 
 /// Severity of a lint finding.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -76,20 +76,8 @@ impl LintFinding {
 pub fn lint_automaton(automaton: &Automaton) -> Vec<LintFinding> {
     let mut findings = Vec::new();
 
-    for state_var in &automaton.state {
-        if !is_supported_state_var_type(&state_var.var_type) {
-            findings.push(LintFinding::error(
-                "unknown_state_var_type",
-                format!(
-                    "state var '{}' has unsupported type '{}'",
-                    state_var.name, state_var.var_type
-                ),
-            ));
-        }
-    }
-
     for action in &automaton.actions {
-        if action.to.is_none() && action.kind != "output" {
+        if action.to.is_none() && action.kind != ActionKind::Output {
             findings.push(LintFinding::warning(
                 "action_missing_to",
                 format!(
@@ -343,22 +331,6 @@ fn sort_bundle_findings(findings: &mut [BundleLintFinding]) {
         );
         key_a.cmp(&key_b)
     });
-}
-
-fn is_supported_state_var_type(var_type: &str) -> bool {
-    matches!(
-        var_type,
-        "status"
-            | "counter"
-            | "bool"
-            | "set"
-            | "list"
-            | "string"
-            | "int"
-            | "integer"
-            | "float"
-            | "number"
-    )
 }
 
 fn to_snake_case(value: &str) -> String {

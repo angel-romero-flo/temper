@@ -125,12 +125,15 @@ impl ReactionRegistry {
     }
 }
 
-/// Check if a rule's `to_state` filter matches the actual state.
+/// Whether the statuses a rule's guard pins (its `status == 'S'` /
+/// `status in [...]` conjuncts) allow `to_state`. The guard still runs in
+/// full at dispatch; this only skips rules that cannot fire.
 fn matches_state_filter(rule: &ReactionRule, to_state: &str) -> bool {
-    match &rule.when.to_state {
-        Some(expected) => expected == to_state,
-        None => true,
-    }
+    rule.when
+        .guard
+        .as_ref()
+        .and_then(temper_spec::predicate::Expr::required_statuses)
+        .is_none_or(|statuses| statuses.contains(to_state))
 }
 
 #[cfg(test)]
@@ -151,14 +154,13 @@ mod tests {
             when: ReactionTrigger {
                 entity_type: entity_type.to_string(),
                 action: action.map(|s| s.to_string()),
-                to_state: to_state.map(|s| s.to_string()),
-                guard: None,
+                guard: to_state
+                    .map(|s| temper_spec::predicate::parse(&format!("status == '{s}'")).unwrap()),
             },
             then: ReactionTarget {
                 entity_type: target_type.to_string(),
                 action: target_action.to_string(),
-                params: serde_json::json!({}),
-                params_from: BTreeMap::new(),
+                args: BTreeMap::new(),
             },
             resolve_target: TargetResolver::SameId,
             principal: None,

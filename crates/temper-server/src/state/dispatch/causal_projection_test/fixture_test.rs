@@ -33,8 +33,8 @@ principal="verifier-service"
 target_entity="Verifier"
 target_action="Verify"
 [action.triggers.resolve_target]
-type="field"
-field="verifier_id"
+kind ="field"
+id_field ="verifier_id"
 [[action]]
 name="Delete"
 from=["Draft"]
@@ -47,8 +47,8 @@ principal="verifier-service"
 target_entity="Verifier"
 target_action="Verify"
 [action.triggers.resolve_target]
-type="field"
-field="verifier_id"
+kind ="field"
+id_field ="verifier_id"
 "#;
 const VERIFIER: &str = r#"
 [automaton]

@@ -165,7 +165,7 @@ field = "revision"
             r#"[[state]]
 name = "revision"
 type = "counter"
-initial = "7"
+initial = 7
 [[action]]"#,
         );
     for (index, body) in [

@@ -19,22 +19,22 @@ initial = "Idle"
 [[state]]
 name = "reader_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "writer_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "waiting_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "wasm_in_flight"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Public protocol actions ---
 

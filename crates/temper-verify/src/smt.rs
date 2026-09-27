@@ -693,7 +693,7 @@ initial = "S"
 [[state]]
 name = "labels"
 type = "list"
-initial = "[]"
+initial = []
 
 [[action]]
 name = "ConflictingContains"
@@ -728,7 +728,7 @@ initial = "A"
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Go"
@@ -764,7 +764,7 @@ initial = "A"
 [[state]]
 name = "count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "GoB"
@@ -812,7 +812,7 @@ initial = "A"
 [[state]]
 name = "count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "GoB"

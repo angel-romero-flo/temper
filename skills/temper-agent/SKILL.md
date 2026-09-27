@@ -540,16 +540,16 @@ states = ["State1", "State2", "State3"]
 initial = "State1"
 terminal = ["State3"]   # states no action may leave
 
-# Optional state variables
+# Optional state variables; `initial` is required and written in the type
 [[state]]
 name = "counter_var"
-type = "counter"        # "counter" | "bool"
-initial = "0"
+type = "counter"        # "string" | "bool" | "counter" | "int" | "list"
+initial = 0             # "" | false | 0 | 0 | []
 
 # Actions (state transitions)
 [[action]]
 name = "DoSomething"
-kind = "input"          # "input" | "internal" | "output"
+kind = "input"          # "input" | "internal" | "output" | "composite"
 from = ["State1"]       # states this can fire from
 to = "State2"           # target state
 guard = "counter_var > 0"  # optional precondition (one expression)
@@ -570,11 +570,11 @@ target_entity = "OtherEntity"
 target_action = "DoTargetThing"
 
 [action.triggers.resolve_target]
-type = "field"                # "same_id" | "field" | "create" | "create_if_missing"
-field = "other_entity_id"
+kind = "field"                # "same_id" | "field" | "static" | "create" | "create_if_missing"
+id_field = "other_entity_id"
 
-[action.triggers.params_from]
-target_param = "source_field"
+[action.triggers.args]
+target_param = "source_field" # a field name, `Id`, or a literal: "'text'", "3", "true"
 
 # Safety invariants: one expression, proven in every reachable state
 # (see docs/predicates.md for the grammar)
@@ -593,18 +593,19 @@ reaches = ["State3"]
 
 #### `kind = "entity"` — cross-entity dispatch
 
-Fire an action on another entity when this action commits. Required: `target_entity`, `target_action`. Optional: `principal`, `to_state` (only fire when source ends in this state), `liveness = "Required" | "BestEffort" | "None"`.
+Fire an action on another entity when this action commits. Required: `target_entity`, `target_action`. Optional: `principal`, `guard` (fire only when it holds after the action; `status == 'S'` fires only when the source ends in `S`), `args`, `liveness = "required" | "best_effort" | "none"`, `drop_ok`. Keys of other trigger kinds are load errors.
 
 The resolver picks which target entity to fire on:
 
-| Resolver `type` | Behavior |
+| Resolver `kind` | Behavior |
 |-----------------|----------|
 | `same_id` | Target has the same `id` as source |
-| `field` | Read target id from `field = "<source_field>"` |
+| `field` | Read target id from `id_field = "<source_field>"` |
+| `static` | Target id is `entity_id = "<id>"` |
 | `create` | Always create a new target entity |
 | `create_if_missing` | Create only if no target with that id exists; reads candidate id from `id_field = "<source_field>"` |
 
-Pass params with `[action.triggers.params_from]` — a map from target param name to source field name.
+Pass params with `[action.triggers.args]` — a map from target param name to a value: a source field name (a declared state variable, `Id`, or a parameter of the source action) or a literal (`'text'` in single quotes, an integer, `true`, `false`, `null`).
 
 #### `kind = "wasm"` — WASM module execution
 

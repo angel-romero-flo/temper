@@ -42,12 +42,12 @@ initial = ""
 [[state]]
 name = "active_sessions"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "message_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Configure"

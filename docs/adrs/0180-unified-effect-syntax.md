@@ -5,6 +5,7 @@
 - Deciders: Temper core maintainers
 - Related:
   - ADR-0179: One predicate grammar for every spec condition (the grammar effects extend)
+  - ADR-0181: Strict typed spec reading; one name per concept (the follow-up for values and key names)
   - ADR-0046: Unified action triggers (`[[action.triggers]]`, now the only outgoing call)
   - ADR-0078: Inline action trigger adapters
   - ADR-0041: Governance decision callbacks (the `DispatchCallback` hook)

@@ -7,12 +7,12 @@ allow_indefinite_states = ["Created", "Building", "Active", "Selected"]
 [[state]]
 name = "has_mutation"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "stage_results"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "RecordVariantMutation"

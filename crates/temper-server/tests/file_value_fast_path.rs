@@ -115,17 +115,17 @@ initial = ""
 [[state]]
 name = "has_content"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "version_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Create"
@@ -163,17 +163,17 @@ initial = ""
 [[state]]
 name = "has_content"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "size_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "version_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Create"

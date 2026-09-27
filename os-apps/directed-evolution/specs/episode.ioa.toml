@@ -8,17 +8,17 @@ terminal = ["Completed", "Stopped", "Failed"]
 [[state]]
 name = "has_contract"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "generation_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "winner_selected"
 type = "bool"
-initial = "false"
+initial = false
 
 [[action]]
 name = "BeginEpisodeNegotiation"

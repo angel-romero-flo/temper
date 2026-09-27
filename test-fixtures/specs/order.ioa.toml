@@ -24,12 +24,12 @@ properties = ["WorkspaceId", "Path"]
 [[state]]
 name = "items"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "has_address"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions: Order Lifecycle ---
 

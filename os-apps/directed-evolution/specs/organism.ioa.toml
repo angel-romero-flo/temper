@@ -8,12 +8,12 @@ terminal = ["Archived"]
 [[state]]
 name = "has_parent_version"
 type = "bool"
-initial = "false"
+initial = false
 
 [[state]]
 name = "version_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "ActivateOrganism"

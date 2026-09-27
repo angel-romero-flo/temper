@@ -57,7 +57,7 @@ strict_action_params = true
 [[state]]
 name = "sequence"
 type = "counter"
-initial = "7"
+initial = 7
 [[action]]
 name = "Advance"
 kind = "input"
@@ -103,8 +103,8 @@ initial = "Active"
 strict_action_params = true
 [[state]]
 name = "sequence"
-type = "integer"
-initial = "-3"
+type = "int"
+initial = -3
 [[action]]
 name = "Advance"
 kind = "input"
@@ -151,7 +151,7 @@ pub struct ActionContract {
     pub params: BTreeSet<String>,
     /// Explicit types only; bare parameter names retain constraint-inferred semantics.
     #[serde(default)]
-    pub param_types: BTreeMap<String, String>,
+    pub param_types: BTreeMap<String, temper_spec::automaton::VarType>,
     /// Preconditions checked before effects and field synchronization.
     pub constraints: Vec<ActionConstraint>,
 }
@@ -173,31 +173,21 @@ impl InitialValues {
     pub(crate) fn from_declarations(state: &[temper_spec::automaton::StateVar]) -> Self {
         let mut values = Self::default();
         for var in state {
-            use temper_spec::automaton::{
-                parse_bool_initial, parse_counter_initial_usize, parse_list_initial,
-                parse_var_initial_json,
-            };
-            match var.var_type.as_str() {
-                "counter" => {
-                    values
-                        .counters
-                        .insert(var.name.clone(), parse_counter_initial_usize(&var.initial));
+            use temper_spec::automaton::Initial;
+            match &var.initial {
+                Initial::Counter(n) => {
+                    values.counters.insert(var.name.clone(), *n);
                 }
-                "bool" => {
-                    values
-                        .booleans
-                        .insert(var.name.clone(), parse_bool_initial(&var.initial));
+                Initial::Bool(b) => {
+                    values.booleans.insert(var.name.clone(), *b);
                 }
-                "list" | "set" => {
-                    values
-                        .lists
-                        .insert(var.name.clone(), parse_list_initial(&var.initial));
+                Initial::List(items) => {
+                    values.lists.insert(var.name.clone(), items.clone());
                 }
-                _ => {
-                    values.fields.insert(
-                        var.name.clone(),
-                        parse_var_initial_json(&var.var_type, &var.initial),
-                    );
+                Initial::String(_) | Initial::Int(_) => {
+                    values
+                        .fields
+                        .insert(var.name.clone(), var.initial.to_json());
                 }
             }
         }
@@ -324,12 +314,15 @@ impl TransitionTable {
         }
         for (name, kind) in &contract.param_types {
             if let Some(value) = object.get(name) {
-                let valid = match kind.as_str() {
-                    "string" | "status" => value.is_string(),
-                    "bool" => value.is_boolean(),
-                    "int" | "integer" => value.as_i64().is_some(),
-                    "counter" | "uint64" => value.as_u64().is_some(),
-                    _ => false,
+                use temper_spec::automaton::VarType;
+                let valid = match kind {
+                    VarType::String => value.is_string(),
+                    VarType::Bool => value.is_boolean(),
+                    VarType::Int => value.as_i64().is_some(),
+                    VarType::Counter => value.as_u64().is_some(),
+                    VarType::List => value
+                        .as_array()
+                        .is_some_and(|items| items.iter().all(Value::is_string)),
                 };
                 if !valid {
                     return Err(format!(

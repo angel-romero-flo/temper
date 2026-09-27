@@ -126,7 +126,7 @@ fn numeric_constraints_reject_payloads_the_numeric_effect_would_skip() {
     let source = CONTRACT
         .replace(
             "params = [\"observed\"]",
-            r#"params = ["observed", {name="expected_sequence",type="uint64"}]
+            r#"params = ["observed", {name="expected_sequence",type="counter"}]
 [[action.constraints]]
 kind = "param_equals_field"
 param = "expected_sequence"
@@ -135,7 +135,7 @@ field = "sequence"
         )
         .replacen(
             "[[action]]",
-            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = \"0\"\n\n[[action]]",
+            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = 0\n\n[[action]]",
             1,
         );
     let table = TransitionTable::from_ioa_source(&source);
@@ -183,11 +183,11 @@ fn fresh_defaults_and_every_constraint_run_through_actual_actor() {
 [[state]]
 name = "sequence"
 type = "counter"
-initial = "0"
+initial = 0
 [[state]]
 name = "enabled"
 type = "bool"
-initial = "false"
+initial = false
 [[action]]"#,
             1,
         )
@@ -249,7 +249,7 @@ fn inequality_rejects_invalid_numeric_representations() {
     let source = CONTRACT
         .replacen(
             "[[action]]",
-            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = \"0\"\n[[action]]",
+            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = 0\n[[action]]",
             1,
         )
         .replace(
@@ -287,7 +287,7 @@ fn nonzero_defaults_are_used_by_guards_and_constraints() {
     let source = CONTRACT
         .replacen(
             "[[action]]",
-            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = \"3\"\n[[action]]",
+            "[[state]]\nname = \"sequence\"\ntype = \"counter\"\ninitial = 3\n[[action]]",
             1,
         )
         .replace(
@@ -310,7 +310,7 @@ fn signed_integer_field_can_compare_with_its_declared_default() {
     let source = CONTRACT
         .replacen(
             "[[action]]",
-            "[[state]]\nname = \"offset\"\ntype = \"integer\"\ninitial = \"-1\"\n[[action]]",
+            "[[state]]\nname = \"offset\"\ntype = \"int\"\ninitial = -1\n[[action]]",
             1,
         )
         .replace(
@@ -330,26 +330,22 @@ field = "offset"
 fn explicit_parameter_types_survive_serialization_and_refuse_before_effects() {
     for (kind, valid, invalid) in [
         ("string", serde_json::json!("value"), serde_json::json!(7)),
-        (
-            "status",
-            serde_json::json!("value"),
-            serde_json::json!(false),
-        ),
         ("bool", serde_json::json!(true), serde_json::json!("true")),
         ("int", serde_json::json!(-7), serde_json::json!(7.5)),
-        (
-            "integer",
-            serde_json::json!(-7),
-            serde_json::json!(u64::MAX),
-        ),
+        ("int", serde_json::json!(-7), serde_json::json!(u64::MAX)),
         ("counter", serde_json::json!(7), serde_json::json!(-1)),
         (
-            "uint64",
+            "counter",
             serde_json::json!(u64::MAX),
             serde_json::json!("7"),
         ),
-        ("uint64", serde_json::json!(7), serde_json::json!(-1)),
-        ("uint64", serde_json::json!(7), serde_json::json!(7.5)),
+        ("counter", serde_json::json!(7), serde_json::json!(7.5)),
+        (
+            "list",
+            serde_json::json!(["a", "b"]),
+            serde_json::json!("a"),
+        ),
+        ("list", serde_json::json!([]), serde_json::json!([1])),
     ] {
         let source = CONTRACT.replace(
             "params = [\"observed\"]",

@@ -15,12 +15,12 @@ terminal = ["Resolved"]
 [[state]]
 name = "escalation_tier"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "agent_assigned"
 type = "bool"
-initial = "false"
+initial = false
 
 # --- Actions: Page Lifecycle ---
 

@@ -40,7 +40,7 @@ initial = "alice"
 [[state]]
 name = "observations"
 type = "counter"
-initial = "0"
+initial = 0
 [[action]]
 name = "TransferOwner"
 from = ["Draft"]
@@ -55,7 +55,7 @@ name = "observed"
 kind = "entity"
 target_entity = "Sink"
 target_action = "Record"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 "#
     .replace(
         "strict_action_params = true",

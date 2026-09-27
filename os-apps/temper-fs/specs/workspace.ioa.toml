@@ -14,17 +14,17 @@ terminal = ["Archived"]
 [[state]]
 name = "quota_limit"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "used_bytes"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[state]]
 name = "file_count"
 type = "counter"
-initial = "0"
+initial = 0
 
 # --- Actions ---
 

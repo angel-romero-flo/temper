@@ -21,7 +21,7 @@ initial = ""
 [[state]]
 name = "jobs_triggered"
 type = "counter"
-initial = "0"
+initial = 0
 
 [[action]]
 name = "Start"

@@ -22,8 +22,8 @@ initial="Idle"
 strict_action_params=true
 [[state]]
 name="revision"
-type="counter"
-initial="1"
+type = "counter"
+initial = 1
 [[action]]
 name="Run"
 from=["Idle"]
@@ -51,8 +51,8 @@ kind="entity"
 target_entity="Job"
 target_action="Record"
 [action.triggers.resolve_target]
-type="field"
-field="observed"
+kind ="field"
+id_field ="observed"
 [[action]]
 name="Record"
 from=["Idle"]

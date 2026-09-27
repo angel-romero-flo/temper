@@ -46,8 +46,7 @@ name = "oauth_callback"
 path = "oauth/callback"
 method = "GET"
 action = "HandleOAuthCallback"
-entity_lookup = "query_param"
-entity_param = "state"
+entity_id = "query.state"
 
 [webhook.extract]
 code = "query.code"
@@ -77,10 +76,9 @@ name = "oauth_callback"
 path = "oauth/callback"
 method = "GET"
 action = "HandleOAuthCallback"
-entity_lookup = "query_param"
-entity_param = "state"
 hmac_secret = "{secret:WEBHOOK_HMAC}"
 hmac_header = "x-webhook-signature"
+entity_id = "query.state"
 
 [webhook.extract]
 code = "query.code"

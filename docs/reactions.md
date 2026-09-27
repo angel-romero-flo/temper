@@ -46,11 +46,11 @@ to = "Confirmed"
 [[action.triggers]]
 name = "order_confirmed_triggers_payment"
 kind = "entity"
-to_state = "Confirmed"
+guard = "status == 'Confirmed'"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-params = { requested_by = "system" }
-resolve_target = { type = "same_id" }
+args = { requested_by = "'system'", order_id = "Id" }
+resolve_target = { kind = "same_id" }
 ```
 
 ### When it fires
@@ -58,8 +58,7 @@ resolve_target = { type = "same_id" }
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | (enclosing `[[action]]`) | — | — | The source entity type and action |
-| `to_state` | string | no | Required source post-state — omit to match any |
-| `guard` | string | no | Conditional predicate (see below) |
+| `guard` | string | no | Predicate over the source's post-action `status` and fields (see below); omit to fire on every commit |
 
 ### Target action
 
@@ -68,18 +67,17 @@ resolve_target = { type = "same_id" }
 | `target_entity` | string | yes | Target entity type |
 | `target_action` | string | yes | Action to dispatch |
 | `principal` | string | no | Registered `AgentType` to dispatch as; omit to inherit the invoking principal |
-| `params` | inline table | no | Static parameters, merged into the target action's param payload |
-| `params_from` | inline table | no | Dynamic params: `target_key = "source_field_name"` — at dispatch, read the named source field and bind it to the target param |
+| `args` | table | no | Parameters for the target action: `target_param = "value"`, each value in the [predicate grammar](predicates.md) |
 
-`params` and `params_from` **must not share keys** — that is a parse-time error.
+Each `args` value is a literal — `'text'` in single quotes, an integer, `true`, `false` or `null` — or the name of a source field, read after the source commits (`Id` is the source entity's id). A name must be a declared state variable, `Id`, or a parameter of the source action (parameters are stored as fields); anything else is a load error, so a string written without its single quotes is caught.
 
-If a `params_from` source field is missing on the source entity at dispatch time, the key is logged (`tracing::warn!`) and skipped; the reaction still fires with a partial param map.
+If a named field is missing on the source entity at dispatch time, the key is logged (`tracing::warn!`) and skipped; the reaction still fires with the other params.
 
 ### `resolve_target` — how to pick the target entity ID
 
-| `type` | Required fields | Behavior |
+| `kind` | Required fields | Behavior |
 |---|---|---|
-| `field` | `field` | Read the target entity ID from a source field. Missing → reaction skipped (warn). |
+| `field` | `id_field` | Read the target entity ID from a source field. Missing → reaction skipped (warn). |
 | `same_id` | — | Target ID = source entity ID. |
 | `static` | `entity_id` | Target ID is a fixed string. Useful for per-tenant singletons. |
 | `create_if_missing` | `id_field` | Read target ID from source field; if absent, derive `"{source_id}-derived"`. Good for per-source-entity singletons (e.g., one `FileVersion` per `File`). |
@@ -98,8 +96,11 @@ kind = "entity"
 guard = "ready && job_type in ['rank', 'source_search'] && Workspace[workspace_id].status == 'Active'"
 target_entity = "CurationJob"
 target_action = "Submit"
-resolve_target = { type = "create" }
+resolve_target = { kind = "create" }
 ```
+
+- `status == 'S'` and `status in [...]` conjuncts also tell the registry and the trigger graph which source states the trigger can fire in.
+- Guards apply to entity triggers only; a `guard` on a wasm, adapter, webhook or hook trigger is a load error (those dispatchers do not evaluate one).
 
 - A missing source field reads as `null`: `ready` is false, and `ready == false` is false too.
 - `Workspace[workspace_id].status` reads `workspace_id` from the source entity and fetches each referenced entity's status via `resolve_entity_status` (the same path action guards use). An unset id or a missing entity reads as `null`, so `== 'Active'` is false.
@@ -119,9 +120,8 @@ kind = "entity"
 guard = "job_type == 'source_search'"
 target_entity = "CurationJob"
 target_action = "Submit"
-params = { job_type = "rank" }
-params_from = { input = "output" }
-resolve_target = { type = "create" }
+args = { job_type = "'rank'", input = "output" }
+resolve_target = { kind = "create" }
 ```
 
 Fresh UUID for the new job, `output` from the source piped into the target's `input`.
@@ -137,8 +137,8 @@ kind = "entity"
 guard = "Workspace[workspace_id].status == 'Active'"
 target_entity = "Workspace"
 target_action = "AckSession"
-params_from = { session_id = "id" }
-resolve_target = { type = "field", field = "workspace_id" }
+args = { session_id = "Id" }
+resolve_target = { kind = "field", id_field = "workspace_id" }
 ```
 
 ### 3. Cleanup-on-failed
@@ -149,11 +149,11 @@ When an entity enters Failed, clean up its related resources (on `Order`'s `Fail
 [[action.triggers]]
 name = "order_failed_releases_inventory"
 kind = "entity"
-to_state = "Failed"
+guard = "status == 'Failed'"
 target_entity = "InventoryHold"
 target_action = "Release"
-params_from = { order_id = "id" }
-resolve_target = { type = "field", field = "hold_id" }
+args = { order_id = "Id" }
+resolve_target = { kind = "field", id_field = "hold_id" }
 ```
 
 ---
@@ -186,7 +186,7 @@ Keeping the layers separate is what makes verification tractable (each entity st
 
 ## Converting a `reactions.toml` rule
 
-Each `[[reaction]]` becomes an entity trigger on the action named in `[reaction.when]`: `[reaction.then] entity_type`/`action` become `target_entity`/`target_action`, and `to_state`, `guard`, `params`, `params_from` and `resolve_target` carry over unchanged.
+Each `[[reaction]]` becomes an entity trigger on the action named in `[reaction.when]`: `[reaction.then] entity_type`/`action` become `target_entity`/`target_action`; `to_state` becomes a `status == '...'` conjunct of `guard`; `params` (literals, in single quotes) and `params_from` (field names) become `args`; and `resolve_target` is tagged with `kind`.
 
 ```toml
 # before (reactions.toml)
@@ -207,5 +207,5 @@ name = "order_confirmed_authorizes_payment"
 kind = "entity"
 target_entity = "Payment"
 target_action = "AuthorizePayment"
-resolve_target = { type = "same_id" }
+resolve_target = { kind = "same_id" }
 ```

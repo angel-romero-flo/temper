@@ -87,7 +87,7 @@ impl TransitionTable {
 
         let mut composite_actions = std::collections::BTreeMap::new();
         for action in &automaton.actions {
-            if !action.kind.eq_ignore_ascii_case("composite") {
+            if action.kind != temper_spec::automaton::ActionKind::Composite {
                 continue;
             }
             composite_actions.insert(
@@ -161,7 +161,7 @@ impl TransitionTable {
                                     temper_spec::automaton::ActionParam::Typed {
                                         name,
                                         param_type,
-                                    } => Some((name.clone(), param_type.clone())),
+                                    } => Some((name.clone(), *param_type)),
                                     temper_spec::automaton::ActionParam::Named(_) => None,
                                 })
                                 .collect(),
@@ -258,7 +258,7 @@ initial = "Active"
 
 [[action]]
 name = "IngestPack"
-kind = "Composite"
+kind = "composite"
 from = ["Active"]
 to = "Active"
 record_parent_event = false
