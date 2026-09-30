@@ -172,7 +172,7 @@ pub fn build_router(state: ServerState) -> Router {
 /// otherwise. Slice 3 of K-1 Phase 2 replaces the 501 with a real
 /// streaming dispatch into the bound WASM integration.
 #[tracing::instrument(skip_all, fields(http.method = %method, http.route = %uri.path()))]
-async fn http_endpoint_fallback(
+pub async fn http_endpoint_fallback(
     State(state): State<ServerState>,
     authenticated: Option<Extension<AuthenticatedRequestContext>>,
     admitted: Option<Extension<crate::http_endpoint::AdmittedHttpEndpoint>>,
@@ -225,6 +225,19 @@ async fn dispatch_matched_route(
     body: Body,
     route: crate::http_endpoint::MatchedRoute,
 ) -> Response {
+    if let Some(config) = route.route.native.clone() {
+        return crate::http_endpoint::native::dispatch(
+            &state,
+            authenticated,
+            method,
+            uri,
+            headers,
+            body,
+            route,
+            config,
+        )
+        .await;
+    }
     use temper_wasm::http_stream::HttpResponseHead;
     use temper_wasm::types::{HttpDispatchContext, WasmInvocationContext};
     let tenant_id = authenticated.tenant().clone();
