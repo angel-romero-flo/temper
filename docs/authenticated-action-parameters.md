@@ -48,6 +48,10 @@ values using ordinary declared parameters, not attempt to impersonate a caller.
 
 Regression tests: `cargo test -p temper-server --test authenticated_params` and
 `cargo test -p temper-server --lib authenticated_params`.
-The tests use actual verification results, OData handlers and a local libSQL
-journal. PostgreSQL resolution is compiled but requires a PostgreSQL integration
-environment to exercise persistence on that backend.
+The tests use actual verification results, OData handlers, a local libSQL
+journal, and the PostgreSQL actor runtime. The PostgreSQL regression rejects
+caller overrides before enqueueing, executes an accepted action, and reads the
+committed owner through a fresh actor system. It starts an isolated PostgreSQL
+testcontainer (Docker required), or uses the existing test helper's
+`TEMPER_ACTOR_TEST_DATABASE_URL` override for a local database named
+`temper_test_*`. No database test is silently skipped.

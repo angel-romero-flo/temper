@@ -1,5 +1,8 @@
 //! Authenticated action inputs are resolved from trusted identity before validation.
 //! Exercises public OData, direct dispatch, fail-closed rejection and durable replay.
+#[path = "authenticated_params/postgres.rs"]
+mod postgres;
+
 use axum::{
     Extension,
     body::{Bytes, to_bytes},
@@ -82,7 +85,7 @@ fn fixture(extra_policy: &str) -> ServerState {
                     details: None,
                 })
                 .collect(),
-            verified_at: chrono::Utc::now().to_rfc3339(),
+            verified_at: "2026-09-06T00:00:00Z".into(),
         }),
     );
     let state = ServerState::from_registry(ActorSystem::new("owner-binding-probe"), registry);
