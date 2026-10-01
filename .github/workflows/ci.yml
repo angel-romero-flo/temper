@@ -362,7 +362,8 @@ jobs:
       # collection's CSDL and IOA behavior; test the strict CLI on assembled
       # application fixtures, including missing-policy/module failure cases.
       - name: Verify repository sources and complete application fixtures
-        run: cargo test --locked -p temper-cli verify::
+        run: |
+          cargo test --locked -p temper-cli verify::
 
 
 
