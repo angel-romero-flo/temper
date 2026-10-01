@@ -29,6 +29,8 @@ async fn standard_server_keeps_schema_for_secrets_wasm_and_spec_restoration() {
     let mut state =
         ServerState::from_registry(ActorSystem::new("schema-test"), SpecRegistry::new())
             .with_secrets_vault(SecretsVault::new(&[7u8; 32]));
+    let data_dir = tempfile::tempdir().unwrap();
+    state.data_dir = data_dir.path().to_path_buf();
     state.set_storage_stack(StorageStack::from_postgres(store.clone()));
     let vault = state.secrets_vault.as_ref().unwrap();
     let (ciphertext, nonce) = vault.encrypt(b"test-value").unwrap();
