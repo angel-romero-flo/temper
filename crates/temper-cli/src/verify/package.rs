@@ -1,16 +1,11 @@
-//! Validate a complete deployment artifact with the same verifier used by `temper verify`.
+//! Policy and compiled module checks for `temper verify`.
 use anyhow::{Context, Result};
 use std::path::Path;
 
-pub(crate) fn run(source: &Path) -> Result<()> {
-    let specs = source.join("specs");
-    anyhow::ensure!(
-        specs.join("model.csdl.xml").is_file(),
-        "missing specs/model.csdl.xml"
-    );
+pub(super) fn validate(specs: &Path) -> Result<()> {
     let mut policies = String::new();
     let mut entities = 0;
-    for entry in std::fs::read_dir(&specs)? {
+    for entry in std::fs::read_dir(specs)? {
         let path = entry?.path();
         let Some(stem) = path
             .file_name()
@@ -56,5 +51,5 @@ pub(crate) fn run(source: &Path) -> Result<()> {
     }
     anyhow::ensure!(entities > 0, "source contains no IOA specifications");
     temper_authz::AuthzEngine::new(&policies).context("invalid Cedar policy")?;
-    super::run_specs(&specs, true)
+    Ok(())
 }

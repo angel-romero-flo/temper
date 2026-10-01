@@ -1,6 +1,6 @@
 //! Verification cascade command for `temper verify`.
 //!
-//! Shared specification verification, with strict checks for complete applications.
+//! Validates application files and requires a complete verification result.
 
 use std::fs;
 use std::path::Path;
@@ -11,20 +11,15 @@ use temper_spec::csdl::parse_csdl;
 use temper_spec::model::build_spec_model;
 
 mod input;
-pub(crate) mod package;
+mod package;
 use input::read_ioa_sources;
 
 /// Run the `temper verify` command.
 ///
-/// Loads specs from the given directory, builds the spec model, and reports
-/// validation results. Complete applications use `verify-app` for packaging checks.
+/// Loads CSDL and IOA, validates policies and compiled module references, and
+/// runs the verification cascade. Missing files and incomplete proofs fail.
 pub fn run(specs_dir: &str) -> Result<()> {
-    run_specs(Path::new(specs_dir), false)
-}
-
-/// Application mode requires a complete model and a complete cross-entity proof.
-/// Directory mode also serves partial collections of independent specification fixtures.
-fn run_specs(specs_path: &Path, application: bool) -> Result<()> {
+    let specs_path = Path::new(specs_dir);
     println!("Running verification cascade...");
     println!("  Specs directory: {}", specs_path.display());
 
@@ -39,114 +34,19 @@ fn run_specs(specs_path: &Path, application: bool) -> Result<()> {
 
     let csdl_xml = fs::read_to_string(&csdl_path)
         .with_context(|| format!("Failed to read {}", csdl_path.display()))?;
-    if application {
-        input::validate_xml_document(&csdl_xml)?;
-    }
+    input::validate_xml_document(&csdl_xml)?;
     let csdl = parse_csdl(&csdl_xml)
         .with_context(|| format!("Failed to parse CSDL from {}", csdl_path.display()))?;
 
-    if application {
-        anyhow::ensure!(!csdl.schemas.is_empty(), "CSDL must contain a Schema");
-    }
+    anyhow::ensure!(!csdl.schemas.is_empty(), "CSDL must contain a Schema");
 
     // Read IOA TOML specs (preferred) and TLA+ specs (legacy)
-    let ioa_sources = read_ioa_sources(specs_path, application)?;
+    let ioa_sources = read_ioa_sources(specs_path)?;
     let tla_sources = read_tla_sources(specs_path)?;
-    if application {
-        input::validate_ioa_entities(&csdl, &ioa_sources)?;
-    }
+    input::validate_ioa_entities(&csdl, &ioa_sources)?;
+    package::validate(specs_path)?;
 
-    // Run IOA verification cascade if IOA files found
-    if !ioa_sources.is_empty() {
-        let mut parsed_automata = std::collections::BTreeMap::new();
-        let mut lint_error_count = 0usize;
-        let mut lint_error_lines = Vec::new();
-
-        for (entity_name, ioa_source) in &ioa_sources {
-            let automaton = temper_spec::automaton::parse_automaton(ioa_source)
-                .with_context(|| format!("Failed to parse IOA spec for '{entity_name}'"))?;
-
-            for finding in lint_automaton(&automaton) {
-                match finding.severity {
-                    LintSeverity::Error => {
-                        lint_error_count += 1;
-                        lint_error_lines.push(format!(
-                            "{entity_name}: {} — {}",
-                            finding.code, finding.message
-                        ));
-                        println!(
-                            "\n  [lint:error] {entity_name}: {} — {}",
-                            finding.code, finding.message
-                        );
-                    }
-                    LintSeverity::Warning => {
-                        println!(
-                            "\n  [lint:warn] {entity_name}: {} — {}",
-                            finding.code, finding.message
-                        );
-                    }
-                }
-            }
-
-            parsed_automata.insert(entity_name.clone(), automaton);
-        }
-
-        for finding in lint_automata_bundle(&parsed_automata) {
-            match finding.severity {
-                LintSeverity::Error => {
-                    lint_error_count += 1;
-                    lint_error_lines.push(format!(
-                        "{}: {} — {}",
-                        finding.entity, finding.code, finding.message
-                    ));
-                    println!(
-                        "\n  [lint:error] {}: {} — {}",
-                        finding.entity, finding.code, finding.message
-                    );
-                }
-                LintSeverity::Warning => {
-                    println!(
-                        "\n  [lint:warn] {}: {} — {}",
-                        finding.entity, finding.code, finding.message
-                    );
-                }
-            }
-        }
-
-        if lint_error_count > 0 {
-            anyhow::bail!(
-                "IOA lint failed with {lint_error_count} error(s): {}",
-                lint_error_lines.join(" | ")
-            );
-        }
-
-        println!("\nRunning IOA verification cascade...");
-        for (entity_name, ioa_source) in &ioa_sources {
-            println!("\n  Verifying {entity_name}...");
-            let cascade = temper_verify::cascade::VerificationCascade::from_ioa(ioa_source)
-                .with_sim_seeds(5)
-                .with_prop_test_cases(100);
-            let result = cascade.run();
-            for level in &result.levels {
-                let status = if level.passed { "PASS" } else { "FAIL" };
-                println!("    [{status}] {}", level.summary);
-            }
-            if !result.all_passed {
-                anyhow::bail!("IOA verification failed for entity '{entity_name}'");
-            }
-        }
-        println!("\nIOA verification cascade: ALL PASSED");
-
-        // ADR-0150: directory verification ALWAYS runs composite cross-entity
-        // verification as a first-class, gating step. It composes every
-        // entity's joint state machine and BFS-checks that no cross-entity
-        // reaction is dropped (target not in its required from-state). This is
-        // only meaningful with two or more entities — a single spec has nothing
-        // to compose (and stdin verification stays per-entity by design).
-        if parsed_automata.len() >= 2 {
-            run_composite_verification(&parsed_automata, application)?;
-        }
-    }
+    verify_ioa_sources(&ioa_sources)?;
 
     // Build spec model (which includes cross-validation)
     let spec = build_spec_model(csdl, tla_sources);
@@ -206,6 +106,104 @@ fn run_specs(specs_path: &Path, application: bool) -> Result<()> {
     Ok(())
 }
 
+/// Verify IOA behavior independently of artifact packaging. Unit tests also use
+/// this to check source collections whose modules and policies are supplied later.
+fn verify_ioa_sources(ioa_sources: &std::collections::BTreeMap<String, String>) -> Result<()> {
+    // Run IOA verification cascade if IOA files found
+    if !ioa_sources.is_empty() {
+        let mut parsed_automata = std::collections::BTreeMap::new();
+        let mut lint_error_count = 0usize;
+        let mut lint_error_lines = Vec::new();
+
+        for (entity_name, ioa_source) in ioa_sources {
+            let automaton = temper_spec::automaton::parse_automaton(ioa_source)
+                .with_context(|| format!("Failed to parse IOA spec for '{entity_name}'"))?;
+
+            for finding in lint_automaton(&automaton) {
+                match finding.severity {
+                    LintSeverity::Error => {
+                        lint_error_count += 1;
+                        lint_error_lines.push(format!(
+                            "{entity_name}: {} — {}",
+                            finding.code, finding.message
+                        ));
+                        println!(
+                            "\n  [lint:error] {entity_name}: {} — {}",
+                            finding.code, finding.message
+                        );
+                    }
+                    LintSeverity::Warning => {
+                        println!(
+                            "\n  [lint:warn] {entity_name}: {} — {}",
+                            finding.code, finding.message
+                        );
+                    }
+                }
+            }
+
+            parsed_automata.insert(entity_name.clone(), automaton);
+        }
+
+        for finding in lint_automata_bundle(&parsed_automata) {
+            match finding.severity {
+                LintSeverity::Error => {
+                    lint_error_count += 1;
+                    lint_error_lines.push(format!(
+                        "{}: {} — {}",
+                        finding.entity, finding.code, finding.message
+                    ));
+                    println!(
+                        "\n  [lint:error] {}: {} — {}",
+                        finding.entity, finding.code, finding.message
+                    );
+                }
+                LintSeverity::Warning => {
+                    println!(
+                        "\n  [lint:warn] {}: {} — {}",
+                        finding.entity, finding.code, finding.message
+                    );
+                }
+            }
+        }
+
+        if lint_error_count > 0 {
+            anyhow::bail!(
+                "IOA lint failed with {lint_error_count} error(s): {}",
+                lint_error_lines.join(" | ")
+            );
+        }
+
+        println!("\nRunning IOA verification cascade...");
+        for (entity_name, ioa_source) in ioa_sources {
+            println!("\n  Verifying {entity_name}...");
+            let cascade = temper_verify::cascade::VerificationCascade::from_ioa(ioa_source)
+                .with_sim_seeds(5)
+                .with_prop_test_cases(100);
+            let result = cascade.run();
+            for level in &result.levels {
+                let status = if level.passed { "PASS" } else { "FAIL" };
+                println!("    [{status}] {}", level.summary);
+            }
+            if !result.all_passed {
+                anyhow::bail!("IOA verification failed for entity '{entity_name}'");
+            }
+        }
+        println!("\nIOA verification cascade: ALL PASSED");
+
+        // ADR-0150: directory verification ALWAYS runs composite cross-entity
+        // verification as a first-class, gating step. It composes every
+        // entity's joint state machine and BFS-checks that no cross-entity
+        // reaction is dropped (target not in its required from-state). This is
+        // only meaningful with two or more entities — a single spec has nothing
+        // to compose (and stdin verification stays per-entity by design).
+        if parsed_automata.len() >= 2 {
+            run_composite_verification(&parsed_automata)?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Run always-on composite cross-entity verification over the parsed
 /// automata (ADR-0150).
 ///
@@ -216,7 +214,6 @@ fn run_specs(specs_path: &Path, application: bool) -> Result<()> {
 /// An INCOMPLETE run (budget exhausted) fails complete-application verification.
 fn run_composite_verification(
     parsed_automata: &std::collections::BTreeMap<String, temper_spec::automaton::Automaton>,
-    application: bool,
 ) -> Result<()> {
     use temper_verify::composite::verify_all;
 
@@ -225,12 +222,11 @@ fn run_composite_verification(
 
     println!("\nRunning composite cross-entity verification (ADR-0150)...");
     let results = verify_all(&automaton_refs);
-    report_composite_results(&results, application)
+    report_composite_results(&results)
 }
 
 fn report_composite_results(
     results: &[temper_verify::composite::CompositeVerifyResult],
-    application: bool,
 ) -> Result<()> {
     use temper_verify::composite::CompositeOutcome;
 
@@ -292,15 +288,9 @@ fn report_composite_results(
         );
     }
     if any_incomplete {
-        if application {
-            anyhow::bail!("composite verification incomplete: state exploration budget exhausted");
-        }
-        println!(
-            "\nComposite cross-entity verification: INCOMPLETE (partial proof; increase budget to complete)"
-        );
-    } else {
-        println!("\nComposite cross-entity verification: ALL PASSED");
+        anyhow::bail!("composite verification incomplete: state exploration budget exhausted");
     }
+    println!("\nComposite cross-entity verification: ALL PASSED");
 
     Ok(())
 }
@@ -313,3 +303,6 @@ mod tests;
 
 #[cfg(test)]
 mod migration_tests;
+
+#[cfg(test)]
+mod repository_tests;

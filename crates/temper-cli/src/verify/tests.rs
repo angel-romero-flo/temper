@@ -2,8 +2,23 @@ use super::*;
 
 #[test]
 fn test_verify_reference_specs() {
-    let specs_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-fixtures/specs");
-    run(specs_dir).expect("standalone specification fixtures should pass");
+    let fixtures = Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-fixtures/specs"
+    ));
+    let app = tempfile::tempdir().unwrap();
+    fs::create_dir(app.path().join("policies")).unwrap();
+    // This CSDL accompanies Order. Other files in the fixture collection are
+    // independent examples, including mutually exclusive Process definitions.
+    for file in [
+        "model.csdl.xml",
+        "order.ioa.toml",
+        "order.tla",
+        "policies/order.cedar",
+    ] {
+        fs::copy(fixtures.join(file), app.path().join(file)).unwrap();
+    }
+    run(app.path().to_str().unwrap()).expect("complete reference application should pass");
 }
 
 #[test]
@@ -62,6 +77,24 @@ params = ["title", "description", "plan_id"]
     fs::write(specs_dir.join("plan.ioa.toml"), plan).expect("write plan");
     fs::write(specs_dir.join("task.ioa.toml"), task).expect("write task");
 
+    fs::create_dir(specs_dir.join("policies")).unwrap();
+    for path in fs::read_dir(specs_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+    {
+        if let Some(stem) = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.strip_suffix(".ioa.toml"))
+        {
+            // These tests exercise IOA failures, with explicit deny-all policy fixtures.
+            fs::write(
+                specs_dir.join("policies").join(format!("{stem}.cedar")),
+                "forbid(principal, action, resource);",
+            )
+            .unwrap();
+        }
+    }
     let result = run(specs_dir.to_str().expect("tmp path utf-8"));
     let err = result.expect_err("verify should fail on broken spawn contract");
     let msg = err.to_string();
@@ -147,6 +180,24 @@ to = "Frozen"
     fs::write(specs_dir.join("file.ioa.toml"), file).expect("write file");
     fs::write(specs_dir.join("workspace.ioa.toml"), workspace).expect("write workspace");
 
+    fs::create_dir(specs_dir.join("policies")).unwrap();
+    for path in fs::read_dir(specs_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+    {
+        if let Some(stem) = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.strip_suffix(".ioa.toml"))
+        {
+            // These tests exercise IOA failures, with explicit deny-all policy fixtures.
+            fs::write(
+                specs_dir.join("policies").join(format!("{stem}.cedar")),
+                "forbid(principal, action, resource);",
+            )
+            .unwrap();
+        }
+    }
     let result = run(specs_dir.to_str().expect("tmp path utf-8"));
     let err = result.expect_err("composite gating step must fail on a dropped reaction");
     let msg = err.to_string();

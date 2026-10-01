@@ -1,4 +1,4 @@
-//! Input checks shared by directory and complete-application verification.
+//! Input checks for `temper verify`.
 use anyhow::{Context, Result};
 use std::{collections::BTreeMap, fs, path::Path};
 use temper_spec::csdl::CsdlDocument;
@@ -28,10 +28,7 @@ pub(super) fn validate_ioa_entities(
 }
 
 /// Read all `.ioa.toml` files from the specs directory.
-pub(super) fn read_ioa_sources(
-    specs_dir: &Path,
-    application: bool,
-) -> Result<BTreeMap<String, String>> {
+pub(super) fn read_ioa_sources(specs_dir: &Path) -> Result<BTreeMap<String, String>> {
     let mut sources = BTreeMap::new();
 
     if !specs_dir.is_dir() {
@@ -53,15 +50,9 @@ pub(super) fn read_ioa_sources(
             let source = fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read IOA file: {}", path.display()))?;
 
-            let entity_name = if application {
-                temper_spec::automaton::parse_automaton(&source)?
-                    .automaton
-                    .name
-            } else {
-                // Standalone fixture collections may contain several alternative
-                // definitions of one entity; retain their distinct file identities.
-                crate::util::to_pascal_case(file_name.trim_end_matches(".ioa.toml"))
-            };
+            let entity_name = temper_spec::automaton::parse_automaton(&source)?
+                .automaton
+                .name;
             anyhow::ensure!(
                 sources.insert(entity_name.clone(), source).is_none(),
                 "duplicate entity {entity_name}"

@@ -61,13 +61,13 @@ fn application() -> TempDir {
 }
 
 fn verify_specs(app: &TempDir) -> Result<()> {
-    run_specs(&app.path().join("specs"), true)
+    run(app.path().join("specs").to_str().unwrap())
 }
 
 #[test]
 fn complete_application_passes() {
     let app = application();
-    package::run(app.path()).unwrap();
+    verify_specs(&app).unwrap();
 }
 
 #[test]
@@ -120,6 +120,11 @@ fn declared_entity_name_is_used_and_duplicates_fail() {
         specs.join("different_filename.ioa.toml"),
     )
     .unwrap();
+    fs::rename(
+        specs.join("policies/counter.cedar"),
+        specs.join("policies/different_filename.cedar"),
+    )
+    .unwrap();
     verify_specs(&app).unwrap();
     fs::write(specs.join("counter.ioa.toml"), IOA).unwrap();
     assert!(
@@ -136,9 +141,8 @@ fn exhausted_real_composite_verification_fails_the_command() {
     let automaton = temper_spec::automaton::parse_automaton(IOA).unwrap();
     let result = verify_composite_with_budget(&[&automaton], "Counter", 1).unwrap();
     assert_eq!(result.outcome, CompositeOutcome::Incomplete);
-    assert!(report_composite_results(std::slice::from_ref(&result), false).is_ok());
     assert!(
-        report_composite_results(&[result], true)
+        report_composite_results(&[result])
             .unwrap_err()
             .to_string()
             .contains("incomplete")
@@ -151,14 +155,14 @@ fn missing_or_invalid_cedar_fails() {
     let policy = app.path().join("specs/policies/counter.cedar");
     fs::remove_file(&policy).unwrap();
     assert!(
-        package::run(app.path())
+        verify_specs(&app)
             .unwrap_err()
             .to_string()
             .contains("missing Cedar policy")
     );
     fs::write(policy, "this is not Cedar").unwrap();
     assert!(
-        package::run(app.path())
+        verify_specs(&app)
             .unwrap_err()
             .to_string()
             .contains("invalid Cedar policy")
@@ -170,7 +174,7 @@ fn no_ioa_cannot_pass_application_verification() {
     let app = application();
     fs::remove_file(app.path().join("specs/counter.ioa.toml")).unwrap();
     assert!(
-        package::run(app.path())
+        verify_specs(&app)
             .unwrap_err()
             .to_string()
             .contains("no IOA specifications")
@@ -183,7 +187,7 @@ fn referenced_wasm_must_exist_and_cannot_escape_modules_directory() {
         let app = application();
         let source = IOA.replace("[[invariant]]", &format!("[[action.triggers]]\nname=\"probe\"\nkind=\"wasm\"\nmodule=\"{module}\"\n\n[[invariant]]"));
         fs::write(app.path().join("specs/counter.ioa.toml"), source).unwrap();
-        let error = package::run(app.path()).unwrap_err().to_string();
+        let error = verify_specs(&app).unwrap_err().to_string();
         assert!(
             error.contains(if module == "probe" {
                 "missing compiled WASM module"
@@ -196,11 +200,13 @@ fn referenced_wasm_must_exist_and_cannot_escape_modules_directory() {
 }
 
 #[test]
-fn verify_app_is_exposed_by_standard_cli() {
+fn only_existing_verify_command_is_exposed() {
     use clap::Parser;
-    let cli =
-        crate::Cli::try_parse_from(["temper", "verify-app", "--source", "/tmp/example"]).unwrap();
+    let cli = crate::Cli::try_parse_from(["temper", "verify", "--specs-dir", "/tmp/example/specs"])
+        .unwrap();
     assert!(
-        matches!(cli.command, crate::Commands::VerifyApp { source } if source == Path::new("/tmp/example"))
+        matches!(cli.command, crate::Commands::Verify { specs_dir } if specs_dir == "/tmp/example/specs")
     );
+    assert!(crate::Cli::try_parse_from(["temper", "verify-app"]).is_err());
+    assert!(crate::Cli::try_parse_from(["temper", "verify", "--application"]).is_err());
 }
