@@ -66,6 +66,13 @@ enum Commands {
         #[arg(short, long, default_value = "specs")]
         specs_dir: String,
     },
+    /// Verify a compiled application: CSDL/IOA, Cedar policies, and referenced WASM files.
+    VerifyApp {
+        /// Application directory containing specs/, policies under specs/policies/,
+        /// and compiled modules under specs/modules/. Any failed or incomplete check fails the command.
+        #[arg(long)]
+        source: PathBuf,
+    },
     /// Lint specs locally, then run the verification cascade on a remote Temper server
     VerifyRemote {
         /// Path to the specs directory
@@ -355,6 +362,7 @@ async fn async_main(cli: Cli) -> anyhow::Result<()> {
             output_dir,
         } => codegen::run(&specs_dir, &output_dir)?,
         Commands::Verify { specs_dir } => verify::run(&specs_dir)?,
+        Commands::VerifyApp { source } => verify::package::run(&source)?,
         Commands::VerifyRemote {
             specs_dir,
             url,
