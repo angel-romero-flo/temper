@@ -44,3 +44,17 @@ to that secret or allowing the integration to read unrelated secrets.
 The compiled fixture in `crates/temper-server/tests/fixtures/wasm-identity` and
 `wasm_identity_admission` tests exercise these boundaries with real WASM, Cedar,
 OData and libSQL. The change contains no application-specific lifecycle rules.
+
+## Standard-server reload regression
+
+A real control-plane update exposed a separate startup defect. `serve --app`
+restored passed verification from libSQL, loaded the same disk spec with a Pending
+status, then skipped its background verification because the hash was cached as
+verified. Reloading identical passed specs now retains the original evidence.
+Changed, failed, running and pending specs still require verification.
+
+Four CLI regressions cover this behavior. Before the fix, the two preservation
+cases failed; all four pass afterwards. A real standard-server process started
+twice against one libSQL database changed from `passed, pending` to `passed, passed`.
+The full CLI suite passed 78 tests. This fixes normal application replacement; it
+does not add control-plane recovery for interrupted integrations.
