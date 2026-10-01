@@ -421,3 +421,28 @@ fn malformed_admission_configuration_is_not_silently_ignored() {
         assert!(route.is_none());
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn missing_module_does_not_execute_admission() {
+    let (state, _dir) = fixture().await;
+    let route = temper_server::http_endpoint::route_from_entity_fields("probe", &json!({
+        "PathPrefix":"/probe/{id}", "Methods":"GET", "IntegrationModule":"not-installed", "RequiresAuth":true,
+        "AdmissionActions":json!([{"name":"child", "entity_set":"Children", "entity_id":"{id}", "action":"Probe.Remove"}]).to_string()
+    })).unwrap();
+    state
+        .http_endpoint_tables
+        .table_for(&TenantId::new("probe"))
+        .await
+        .replace(vec![route])
+        .await;
+    assert_eq!(endpoint_call(&state, "alice").await.status(), 503);
+    assert_eq!(
+        state
+            .get_tenant_entity_state(&TenantId::new("probe"), "Child", "mine")
+            .await
+            .unwrap()
+            .state
+            .status,
+        "Active"
+    );
+}

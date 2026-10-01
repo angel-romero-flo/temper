@@ -20,6 +20,26 @@ No caller credential is passed to the module. Checks run on every request even
 when an incoming idempotency key repeats. Ordered actions are not a transaction;
 an earlier successful action is not rolled back if a later action rejects.
 
+Before any action runs, the kernel resolves the WASM module (or native transport)
+and validates the complete action declaration: unique response names, schema
+identifier syntax, capture values and OData paths. Native requests are bounded to
+8 MiB before actions execute. Validation failures do not execute earlier actions.
+An action that passes validation but later fails authorization or its IOA checks
+still leaves earlier successful actions committed.
+
+Admission requires a completed action result. PostgreSQL-backed actions currently
+return HTTP 202 when queued, before IOA execution completes. Such admission targets
+are rejected with HTTP 503 `AdmissionRequiresCompletion` before any action is
+queued or executed. Native and WASM endpoints use the same rule; the kernel does
+not treat queue acceptance as permission to perform external I/O.
+
+`TimeoutSecs` supplies one deadline across admission and dispatch, without restarting
+it when waiting for response headers. Native response bodies retain that deadline
+while streaming and enforce `MaxResponseBytes` (1 MiB by default). If a limit is
+exceeded after headers have been sent, the body ends with an error. Native transports
+receive headers with the same caller-credential exclusions as ordinary WASM HTTP
+endpoints, in addition to connection and identity-header filtering.
+
 Endpoints without admission actions keep their existing behavior. Native transport
 configuration and a separate admission list cannot be combined: malformed or
 ambiguous configuration is rejected when constructing the route table.

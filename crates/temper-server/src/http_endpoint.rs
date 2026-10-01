@@ -27,6 +27,7 @@
 //!   * `Paused` / `Deleted` endpoints never match.
 
 pub mod admission;
+pub(crate) mod budget;
 pub mod native;
 
 use std::collections::BTreeMap;

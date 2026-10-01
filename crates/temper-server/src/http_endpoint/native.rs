@@ -16,7 +16,7 @@ use serde_json::Value;
 use serde_json::json;
 use temper_authz::AuthenticatedRequestContext;
 
-use super::MatchedRoute;
+use super::{MatchedRoute, budget::ExchangeDeadline};
 use crate::{response::odata_error, state::ServerState};
 
 /// Configuration stored in the endpoint's spec-declared `NativeConfig` field.
@@ -102,7 +102,8 @@ pub fn transport_headers(mut headers: HeaderMap) -> HeaderMap {
     let names: Vec<_> = headers
         .keys()
         .filter(|k| {
-            k.as_str().starts_with("x-temper-")
+            crate::router::is_credential_header(k.as_str())
+                || k.as_str().starts_with("x-temper-")
                 || k.as_str().starts_with("x-auth-")
                 || k.as_str().starts_with("x-auth-request-")
         })
@@ -114,34 +115,29 @@ pub fn transport_headers(mut headers: HeaderMap) -> HeaderMap {
     headers
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct NativeRequest {
+    pub authenticated: AuthenticatedRequestContext,
+    pub method: Method,
+    pub uri: Uri,
+    pub headers: HeaderMap,
+    pub body: Body,
+    pub matched: MatchedRoute,
+}
+
 pub(crate) async fn dispatch(
     state: &ServerState,
-    authenticated: AuthenticatedRequestContext,
-    method: Method,
-    uri: Uri,
-    headers: HeaderMap,
-    body: Body,
-    matched: MatchedRoute,
+    request: NativeRequest,
     config: NativeEndpoint,
 ) -> Response {
-    let timeout = Duration::from_secs(u64::from(matched.route.timeout_secs));
-    match tokio::time::timeout(
-        timeout,
-        exchange(
-            state,
-            authenticated,
-            method,
-            uri,
-            headers,
-            body,
-            matched,
-            config,
-        ),
-    )
-    .await
-    {
-        Ok(response) => response,
+    let deadline = ExchangeDeadline::new(Duration::from_secs(u64::from(
+        request.matched.route.timeout_secs,
+    )));
+    let max_bytes =
+        request.matched.route.max_response_bytes.unwrap_or_else(|| {
+            temper_wasm::types::WasmResourceLimits::default().max_response_bytes
+        });
+    match deadline.wait(exchange(state, request, config)).await {
+        Ok(response) => deadline.bound_response(response, max_bytes),
         Err(_) => odata_error(
             StatusCode::GATEWAY_TIMEOUT,
             "TransportTimeout",
@@ -151,17 +147,15 @@ pub(crate) async fn dispatch(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn exchange(
-    state: &ServerState,
-    authenticated: AuthenticatedRequestContext,
-    method: Method,
-    uri: Uri,
-    headers: HeaderMap,
-    body: Body,
-    matched: MatchedRoute,
-    config: NativeEndpoint,
-) -> Response {
+async fn exchange(state: &ServerState, request: NativeRequest, config: NativeEndpoint) -> Response {
+    let NativeRequest {
+        authenticated,
+        method,
+        uri,
+        headers,
+        body,
+        matched,
+    } = request;
     let invalid = |message: &str| {
         odata_error(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -178,12 +172,6 @@ async fn exchange(
     let Some(transport) = state.http_transports.0.get(&config.transport) else {
         return invalid("declared native transport is not installed");
     };
-    let admitted =
-        match super::admission::admit(state, &authenticated, &matched.params, config.actions).await
-        {
-            Ok(admitted) => admitted,
-            Err(response) => return response,
-        };
     let body = match to_bytes(body, 8 * 1024 * 1024).await {
         Ok(v) => v,
         Err(_) => {
@@ -195,6 +183,12 @@ async fn exchange(
             .into_response();
         }
     };
+    let admitted =
+        match super::admission::admit(state, &authenticated, &matched.params, config.actions).await
+        {
+            Ok(admitted) => admitted,
+            Err(response) => return response,
+        };
     // Prefix matching consumes one concrete segment per template segment.
     let segments = matched
         .route
@@ -245,6 +239,8 @@ mod unit_tests {
         let mut headers = HeaderMap::new();
         for (k, v) in [
             ("authorization", "secret"),
+            ("x-api-key", "secret"),
+            ("x-forwarded-access-token", "secret"),
             ("cookie", "secret"),
             ("connection", "x-hop"),
             ("x-hop", "hidden"),
@@ -255,6 +251,9 @@ mod unit_tests {
             ("x-temper-principal-kind", "admin"),
         ] {
             headers.insert(k, v.parse().unwrap());
+        }
+        for name in crate::router::GUEST_FORBIDDEN_CREDENTIAL_HEADERS {
+            headers.insert(name, "credential".parse().unwrap());
         }
         let result = transport_headers(headers);
         assert_eq!(result.len(), 3);

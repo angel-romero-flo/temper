@@ -8,7 +8,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use temper_authz::AuthenticatedRequestContext;
 
 /// An ordinary OData bound action, using path captures as typed string inputs.
@@ -59,16 +59,18 @@ pub(crate) async fn admit(
         )
         .into_response()
     };
-    let mut admitted = BTreeMap::new();
+    let mut prepared = Vec::new();
+    let mut names = BTreeSet::new();
     for gate in actions {
-        if admitted.contains_key(&gate.name) {
+        if !names.insert(gate.name.clone()) {
             return Err(invalid("duplicate admission name"));
         }
         // Set/action names are schema identifiers, never route-derived syntax.
         if ![&gate.entity_set, &gate.action].iter().all(|s| {
-            !s.is_empty()
-                && s.chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+            s.split('.').all(|part| {
+                part.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+                    && part.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            })
         }) {
             return Err(invalid("invalid CSDL identifier in admission"));
         }
@@ -91,6 +93,29 @@ pub(crate) async fn admit(
             id.replace('\'', "''"),
             gate.action
         );
+        if !matches!(temper_odata::parse_path(&path), Ok(temper_odata::ODataPath::BoundAction { parent, .. })
+            if matches!(*parent, temper_odata::ODataPath::Entity(..)))
+        {
+            return Err(invalid("invalid OData admission path"));
+        }
+        let entity_type =
+            crate::odata::resolve_entity_type(state, authenticated.tenant(), &gate.entity_set);
+        if entity_type
+            .as_ref()
+            .is_some_and(|ty| state.is_pg_actor_backed(authenticated.tenant(), ty))
+        {
+            // PG dispatch acknowledges enqueueing, not successful IOA execution.
+            // Reject the whole declaration before ANY action can be queued.
+            return Err(requires_completion());
+        }
+        prepared.push((
+            gate.name,
+            path,
+            Bytes::from(Value::Object(params).to_string()),
+        ));
+    }
+    let mut admitted = BTreeMap::new();
+    for (name, path, params) in prepared {
         // Do not inherit a user idempotency key: admission is evaluated on EVERY
         // request, even when the remote application receives a repeated key.
         let response = crate::odata::handle_odata_post(
@@ -99,10 +124,13 @@ pub(crate) async fn admit(
             HeaderMap::new(),
             Path(path),
             Query(BTreeMap::new()),
-            Bytes::from(Value::Object(params).to_string()),
+            params,
         )
         .await
         .into_response();
+        if response.status() == StatusCode::ACCEPTED {
+            return Err(requires_completion());
+        }
         if !response.status().is_success() {
             return Err(response);
         }
@@ -114,7 +142,13 @@ pub(crate) async fn admit(
             Ok(v) => v,
             Err(_) => return Err(invalid("admission returned invalid JSON")),
         };
-        admitted.insert(gate.name, value);
+        admitted.insert(name, value);
     }
     Ok(admitted)
+}
+
+fn requires_completion() -> Response {
+    odata_error(StatusCode::SERVICE_UNAVAILABLE, "AdmissionRequiresCompletion",
+        "endpoint admission requires completed OData actions; queued PostgreSQL actions are not supported")
+        .into_response()
 }

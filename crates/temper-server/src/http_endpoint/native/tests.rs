@@ -180,3 +180,165 @@ async fn all_gates_must_pass() {
     assert!(!response.status().is_success());
     assert_eq!(count.load(Ordering::SeqCst), 0);
 }
+
+#[tokio::test]
+async fn malformed_later_admission_cannot_create_earlier_entity() {
+    for later in [
+        json!({"name":"target","entity_set":"Targets","entity_id":"two","action":"Example.Serve"}),
+        json!({"name":"second","entity_set":"Targets/invalid","entity_id":"two","action":"Example.Serve"}),
+        json!({"name":"second","entity_set":"Targets","entity_id":"two","action":"Serve"}),
+        json!({"name":"second","entity_set":"Targets","entity_id":"two","action":"Example..Serve"}),
+        json!({"name":"second","entity_set":"Targets","entity_id":"{absent}","action":"Example.Serve"}),
+        json!({"name":"second","entity_set":"Targets","entity_id":"two","action":"Example.Serve","params":{"value":"{absent}"}}),
+    ] {
+        let (state, count) = fixture();
+        let mut c = config();
+        c["actions"].as_array_mut().unwrap().push(later);
+        install(&state, c).await;
+        let response = crate::build_router(state.clone())
+            .oneshot(request("alice"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 500);
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        assert!(
+            !state.entity_exists(&TenantId::default(), "Target", "one"),
+            "invalid declarations must be rejected before the first action"
+        );
+    }
+}
+
+#[tokio::test]
+async fn oversized_request_cannot_run_admission() {
+    let (state, count) = fixture();
+    install(&state, config()).await;
+    let mut req = request("alice");
+    *req.body_mut() = Body::from(vec![0; 8 * 1024 * 1024 + 1]);
+    let response = crate::build_router(state.clone())
+        .oneshot(req)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 413);
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert!(!state.entity_exists(&TenantId::default(), "Target", "one"));
+}
+
+#[tokio::test]
+async fn quoted_parentheses_in_ids_are_data() {
+    for (encoded, decoded) in [("a%29b", "a)b"), ("a%28b", "a(b")] {
+        let (state, count) = fixture();
+        install(&state, config()).await;
+        let mut req = request("alice");
+        *req.uri_mut() = format!("/things/{encoded}/tdata/Items?$filter=Value%20gt%205")
+            .parse()
+            .unwrap();
+        let response = crate::build_router(state.clone())
+            .oneshot(req)
+            .await
+            .unwrap();
+        let status = response.status();
+        let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+        assert_eq!(status, 201, "{decoded}: {}", String::from_utf8_lossy(&body));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert!(state.entity_exists(&TenantId::default(), "Target", decoded));
+    }
+}
+
+#[tokio::test]
+async fn pg_admission_is_rejected_before_enqueue() {
+    let (mut state, count) = fixture();
+    state.actor_backed_types.insert("Target".into());
+    install(&state, config()).await;
+    let response = crate::build_router(state.clone())
+        .oneshot(request("alice"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 503);
+    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    assert!(String::from_utf8_lossy(&body).contains("AdmissionRequiresCompletion"));
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert!(!state.entity_exists(&TenantId::default(), "Target", "one"));
+}
+
+struct Streaming;
+#[async_trait::async_trait]
+impl HttpTransport for Streaming {
+    async fn send(&self, _req: TransportRequest) -> Result<Response, String> {
+        let stream = async_stream::stream! {
+            yield Ok::<_, std::io::Error>(Bytes::from_static(b"first"));
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            yield Ok(Bytes::from_static(b"second"));
+        };
+        Ok(Response::new(Body::from_stream(stream)))
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn response_stream_obeys_original_deadline() {
+    let (mut state, _) = fixture();
+    let mut registry = TransportRegistry::default();
+    registry.register("echo", Arc::new(Streaming));
+    state.http_transports = Arc::new(registry);
+    install(&state, config()).await;
+    let table = state
+        .http_endpoint_tables
+        .table_for(&TenantId::default())
+        .await;
+    let mut route = table
+        .match_request("POST", "/things/one/tdata/Items")
+        .await
+        .unwrap()
+        .route;
+    route.timeout_secs = 1;
+    table.replace(vec![route]).await;
+    let response = crate::build_router(state)
+        .oneshot(request("alice"))
+        .await
+        .unwrap();
+    assert!(
+        to_bytes(response.into_body(), 100).await.is_err(),
+        "body must fail after the exchange deadline"
+    );
+}
+
+#[tokio::test]
+async fn response_stream_obeys_byte_budget() {
+    let (state, _) = fixture();
+    install(&state, config()).await;
+    let table = state
+        .http_endpoint_tables
+        .table_for(&TenantId::default())
+        .await;
+    let mut route = table
+        .match_request("POST", "/things/one/tdata/Items")
+        .await
+        .unwrap()
+        .route;
+    route.max_response_bytes = Some(3);
+    table.replace(vec![route]).await;
+    let response = crate::build_router(state)
+        .oneshot(request("alice"))
+        .await
+        .unwrap();
+    assert!(
+        to_bytes(response.into_body(), 100).await.is_err(),
+        "five response bytes must exceed a three-byte budget"
+    );
+}
+
+#[tokio::test]
+async fn noncanonical_cedar_id_is_not_rewritten_to_bypass_authorization() {
+    let (state, count) = fixture();
+    install(&state, config()).await;
+    let mut req = request("alice");
+    *req.uri_mut() = "/things/a%27%29%2Fb/tdata/Items".parse().unwrap();
+    let response = crate::build_router(state.clone())
+        .oneshot(req)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 403);
+    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    assert!(String::from_utf8_lossy(&body).contains("invalid resource"));
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert!(!state.entity_exists(&TenantId::default(), "Target", "a')/b"));
+}
