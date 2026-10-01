@@ -74,6 +74,7 @@ fn protocol_route_forwarding(
         max_response_bytes: None,
         action_bridge: None,
         native: None,
+        admission_actions: Vec::new(),
     }
 }
 

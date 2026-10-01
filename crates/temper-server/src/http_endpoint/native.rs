@@ -7,12 +7,13 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use axum::{
     body::{Body, Bytes, to_bytes},
-    extract::{Extension, Path, Query, State},
     http::{HeaderMap, Method, StatusCode, Uri},
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use temper_authz::AuthenticatedRequestContext;
 
 use super::MatchedRoute;
@@ -28,22 +29,7 @@ pub struct NativeEndpoint {
     pub actions: Vec<AdmissionAction>,
 }
 
-/// An ordinary OData bound action, using path captures as typed string inputs.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AdmissionAction {
-    /// Key under which the admitted response is given to the transport.
-    pub name: String,
-    /// Entity set from CSDL.
-    pub entity_set: String,
-    /// Entity ID: literal or an entire `{capture}` placeholder.
-    pub entity_id: String,
-    /// Qualified action name from CSDL.
-    pub action: String,
-    /// String parameters: literals or entire `{capture}` placeholders.
-    #[serde(default)]
-    pub params: BTreeMap<String, String>,
-}
+pub use super::admission::AdmissionAction;
 
 /// Per-request transport input; never journaled as entity fields.
 pub struct TransportRequest {
@@ -75,23 +61,6 @@ impl TransportRegistry {
     /// Register a host-owned transport before serving requests.
     pub fn register(&mut self, name: impl Into<String>, transport: Arc<dyn HttpTransport>) {
         self.0.insert(name.into(), transport);
-    }
-}
-
-fn resolve(value: &str, captures: &BTreeMap<String, String>) -> Result<String, String> {
-    if let Some(key) = value.strip_prefix('{').and_then(|s| s.strip_suffix('}')) {
-        let value = captures
-            .get(key)
-            .ok_or_else(|| format!("missing route capture {key}"))?;
-        // Decode once, as data, never as a path or OData expression.
-        let value = percent_encoding::percent_decode_str(value)
-            .decode_utf8()
-            .map_err(|_| "route capture is not UTF-8".to_string())?;
-        Ok(value.into_owned())
-    } else if value.contains(['{', '}']) {
-        Err("route placeholders must occupy the entire value".into())
-    } else {
-        Ok(value.to_owned())
     }
 }
 
@@ -209,63 +178,12 @@ async fn exchange(
     let Some(transport) = state.http_transports.0.get(&config.transport) else {
         return invalid("declared native transport is not installed");
     };
-    let mut admitted = BTreeMap::new();
-    for gate in config.actions {
-        if admitted.contains_key(&gate.name) {
-            return invalid("duplicate admission name");
-        }
-        // Set/action names are schema identifiers, never route-derived syntax.
-        if ![&gate.entity_set, &gate.action].iter().all(|s| {
-            !s.is_empty()
-                && s.chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
-        }) {
-            return invalid("invalid CSDL identifier in admission");
-        }
-        let id = match resolve(&gate.entity_id, &matched.params) {
-            Ok(v) => v,
-            Err(e) => return invalid(&e),
+    let admitted =
+        match super::admission::admit(state, &authenticated, &matched.params, config.actions).await
+        {
+            Ok(admitted) => admitted,
+            Err(response) => return response,
         };
-        let mut params = serde_json::Map::new();
-        for (key, value) in gate.params {
-            match resolve(&value, &matched.params) {
-                Ok(value) => {
-                    params.insert(key, json!(value));
-                }
-                Err(error) => return invalid(&error),
-            }
-        }
-        let path = format!(
-            "{}('{}')/{}",
-            gate.entity_set,
-            id.replace('\'', "''"),
-            gate.action
-        );
-        // Do not inherit a user idempotency key: admission is evaluated on EVERY
-        // request, even when the remote application receives a repeated key.
-        let response = crate::odata::handle_odata_post(
-            State(state.clone()),
-            Some(Extension(authenticated.clone())),
-            HeaderMap::new(),
-            Path(path),
-            Query(BTreeMap::new()),
-            Bytes::from(Value::Object(params).to_string()),
-        )
-        .await
-        .into_response();
-        if !response.status().is_success() {
-            return response;
-        }
-        let bytes = match to_bytes(response.into_body(), 8 * 1024 * 1024).await {
-            Ok(v) => v,
-            Err(_) => return invalid("admission response exceeds budget"),
-        };
-        let value = match serde_json::from_slice(&bytes) {
-            Ok(v) => v,
-            Err(_) => return invalid("admission returned invalid JSON"),
-        };
-        admitted.insert(gate.name, value);
-    }
     let body = match to_bytes(body, 8 * 1024 * 1024).await {
         Ok(v) => v,
         Err(_) => {
@@ -313,6 +231,7 @@ async fn exchange(
 
 #[cfg(test)]
 mod unit_tests {
+    use super::super::admission::resolve;
     use super::*;
     #[test]
     fn captures_are_decoded_as_data() {

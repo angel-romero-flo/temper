@@ -242,6 +242,32 @@ async fn dispatch_matched_route(
     use temper_wasm::types::{HttpDispatchContext, WasmInvocationContext};
     let tenant_id = authenticated.tenant().clone();
 
+    // Run checks through OData/Cedar/IOA with the original authenticated caller.
+    // The module cannot select or forge this identity, and receives only the
+    // successful action responses, never a reusable caller credential.
+    let admitted = match tokio::time::timeout(
+        std::time::Duration::from_secs(u64::from(route.route.timeout_secs)),
+        crate::http_endpoint::admission::admit(
+            &state,
+            &authenticated,
+            &route.params,
+            route.route.admission_actions.clone(),
+        ),
+    )
+    .await
+    {
+        Ok(Ok(admitted)) => admitted,
+        Ok(Err(response)) => return response,
+        Err(_) => {
+            return crate::response::odata_error(
+                StatusCode::GATEWAY_TIMEOUT,
+                "AdmissionTimeout",
+                "Endpoint action checks timed out",
+            )
+            .into_response();
+        }
+    };
+
     // Resolve the integration module hash. The WASM module must
     // already be registered for this tenant (via app install).
     let module_hash: Option<String> = state.wasm_module_registry.read().ok().and_then(|reg| {
@@ -323,7 +349,7 @@ async fn dispatch_matched_route(
         trigger_action: "HandleHttp".to_string(),
         wasm_module: Some(route.route.integration_module.clone()),
         trigger_params: serde_json::Value::Null,
-        entity_state: serde_json::Value::Null,
+        entity_state: serde_json::json!(admitted),
         agent_id: Some(authenticated.security_context().principal.id.clone()),
         session_id: None,
         integration_config: std::collections::BTreeMap::new(),
