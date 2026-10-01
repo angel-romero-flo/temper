@@ -210,3 +210,41 @@ fn only_existing_verify_command_is_exposed() {
     assert!(crate::Cli::try_parse_from(["temper", "verify-app"]).is_err());
     assert!(crate::Cli::try_parse_from(["temper", "verify", "--application"]).is_err());
 }
+
+#[test]
+fn entity_sets_must_reference_declared_qualified_types() {
+    for xml in [
+        CSDL.replace(
+            "EntityType=\"Temper.CounterExample.Counter\"",
+            "EntityType=\"Other.Counter\"",
+        ),
+        CSDL.replace(
+            "</EntityContainer>",
+            "<EntitySet Name=\"Broken\" EntityType=\"Other.Counter\"/></EntityContainer>",
+        ),
+    ] {
+        let app = application();
+        fs::write(app.path().join("specs/model.csdl.xml"), xml).unwrap();
+        assert!(
+            verify_specs(&app).is_err(),
+            "undeclared qualified type passed verification"
+        );
+    }
+}
+
+#[test]
+fn shared_and_uppercase_cedar_files_are_validated() {
+    for name in ["shared.cedar", "shared.CEDAR"] {
+        let app = application();
+        fs::write(
+            app.path().join("specs/policies").join(name),
+            "this is not Cedar",
+        )
+        .unwrap();
+        let error = verify_specs(&app).expect_err("every loaded policy must be validated");
+        assert!(
+            error.to_string().contains("invalid Cedar policy"),
+            "{error:#}"
+        );
+    }
+}

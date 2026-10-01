@@ -3,25 +3,56 @@ use anyhow::{Context, Result};
 use std::{collections::BTreeMap, fs, path::Path};
 use temper_spec::csdl::CsdlDocument;
 
+/// Require declared IOA entities to have CSDL types and correctly qualified sets.
+/// Also reject dangling entity-set references, even if another set is valid.
 pub(super) fn validate_ioa_entities(
     csdl: &CsdlDocument,
     sources: &BTreeMap<String, String>,
 ) -> Result<()> {
-    for name in sources.keys() {
-        anyhow::ensure!(
-            csdl.schemas.iter().any(|schema| schema
+    let declared_types: std::collections::BTreeSet<String> = csdl
+        .schemas
+        .iter()
+        .flat_map(|schema| {
+            schema
                 .entity_types
                 .iter()
-                .any(|entity| entity.name == *name)),
+                .map(|entity| format!("{}.{}", schema.namespace, entity.name))
+        })
+        .collect();
+    let sets: Vec<_> = csdl
+        .schemas
+        .iter()
+        .flat_map(|schema| &schema.entity_containers)
+        .flat_map(|container| &container.entity_sets)
+        .collect();
+    for name in sources.keys() {
+        let matching_types: Vec<_> = csdl
+            .schemas
+            .iter()
+            .filter(|schema| {
+                schema
+                    .entity_types
+                    .iter()
+                    .any(|entity| entity.name == *name)
+            })
+            .map(|schema| format!("{}.{name}", schema.namespace))
+            .collect();
+        anyhow::ensure!(
+            !matching_types.is_empty(),
             "IOA entity {name} is missing from CSDL"
         );
         anyhow::ensure!(
-            csdl.schemas
-                .iter()
-                .flat_map(|schema| &schema.entity_containers)
-                .flat_map(|container| &container.entity_sets)
-                .any(|set| set.entity_type.rsplit('.').next() == Some(name.as_str())),
-            "IOA entity {name} has no CSDL entity set"
+            sets.iter()
+                .any(|set| matching_types.contains(&set.entity_type)),
+            "IOA entity {name} has no CSDL entity set referencing its declared type"
+        );
+    }
+    for set in sets {
+        anyhow::ensure!(
+            declared_types.contains(&set.entity_type),
+            "CSDL entity set {} references undeclared type {}",
+            set.name,
+            set.entity_type
         );
     }
     Ok(())
