@@ -7352,6 +7352,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
  "p256",
+ "percent-encoding",
  "pprof",
  "reqwest 0.12.28",
  "serde",
