@@ -4,11 +4,33 @@ use std::{collections::BTreeMap, fs, path::Path};
 use temper_spec::csdl::CsdlDocument;
 
 /// Require declared IOA entities to have CSDL types and correctly qualified sets.
+/// Resolve declared schema aliases to namespaces before matching type references.
 /// Also reject dangling entity-set references, even if another set is valid.
 pub(super) fn validate_ioa_entities(
     csdl: &CsdlDocument,
     sources: &BTreeMap<String, String>,
 ) -> Result<()> {
+    let mut qualifiers = BTreeMap::new();
+    for schema in &csdl.schemas {
+        for qualifier in std::iter::once(&schema.namespace).chain(schema.alias.iter()) {
+            if let Some(existing) = qualifiers.insert(qualifier.as_str(), schema.namespace.as_str())
+            {
+                anyhow::ensure!(
+                    existing == schema.namespace,
+                    "ambiguous CSDL namespace or alias {qualifier}"
+                );
+            }
+        }
+    }
+    let resolve_type = |name: &str| {
+        name.rsplit_once('.')
+            .and_then(|(qualifier, local_name)| {
+                qualifiers
+                    .get(qualifier)
+                    .map(|namespace| format!("{namespace}.{local_name}"))
+            })
+            .unwrap_or_else(|| name.to_owned())
+    };
     let declared_types: std::collections::BTreeSet<String> = csdl
         .schemas
         .iter()
@@ -24,6 +46,7 @@ pub(super) fn validate_ioa_entities(
         .iter()
         .flat_map(|schema| &schema.entity_containers)
         .flat_map(|container| &container.entity_sets)
+        .map(|set| (set, resolve_type(&set.entity_type)))
         .collect();
     for name in sources.keys() {
         let matching_types: Vec<_> = csdl
@@ -43,13 +66,13 @@ pub(super) fn validate_ioa_entities(
         );
         anyhow::ensure!(
             sets.iter()
-                .any(|set| matching_types.contains(&set.entity_type)),
+                .any(|(_, resolved_type)| matching_types.contains(resolved_type)),
             "IOA entity {name} has no CSDL entity set referencing its declared type"
         );
     }
-    for set in sets {
+    for (set, resolved_type) in sets {
         anyhow::ensure!(
-            declared_types.contains(&set.entity_type),
+            declared_types.contains(&resolved_type),
             "CSDL entity set {} references undeclared type {}",
             set.name,
             set.entity_type

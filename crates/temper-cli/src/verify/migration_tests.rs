@@ -248,3 +248,60 @@ fn shared_and_uppercase_cedar_files_are_validated() {
         );
     }
 }
+
+#[test]
+fn declared_schema_aliases_resolve_entity_sets() {
+    let app = application();
+    let xml = CSDL
+        .replace(
+            "Namespace=\"Temper.CounterExample\"",
+            "Namespace=\"Temper.CounterExample\" Alias=\"CE\"",
+        )
+        .replace(
+            "EntityType=\"Temper.CounterExample.Counter\"",
+            "EntityType=\"CE.Counter\"",
+        );
+    fs::write(app.path().join("specs/model.csdl.xml"), &xml).unwrap();
+    verify_specs(&app).expect("declared schema alias must resolve");
+    fs::write(
+        app.path().join("specs/model.csdl.xml"),
+        xml.replace("CE.Counter", "Other.Counter"),
+    )
+    .unwrap();
+    assert!(
+        verify_specs(&app).is_err(),
+        "undeclared alias must still fail"
+    );
+}
+
+#[test]
+fn schema_alias_can_be_used_from_another_schema() {
+    let app = application();
+    let xml = CSDL.replace(
+        "Namespace=\"Temper.CounterExample\"",
+        "Namespace=\"Temper.CounterExample\" Alias=\"CE\"",
+    ).replace("EntityType=\"Temper.CounterExample.Counter\"", "EntityType=\"CE.Counter\"")
+        .replace("<EntityContainer Name=\"CounterService\">", "</Schema><Schema Namespace=\"Collections\" xmlns=\"http://docs.oasis-open.org/odata/ns/edm\"><EntityContainer Name=\"CounterService\">");
+    fs::write(app.path().join("specs/model.csdl.xml"), xml).unwrap();
+    verify_specs(&app).expect("alias resolution must cover all schemas in the document");
+}
+
+#[test]
+fn ambiguous_schema_aliases_are_rejected() {
+    for conflicting in ["Namespace=\"Other\" Alias=\"CE\"", "Namespace=\"CE\""] {
+        let app = application();
+        let xml = CSDL.replace(
+            "Namespace=\"Temper.CounterExample\"",
+            "Namespace=\"Temper.CounterExample\" Alias=\"CE\"",
+        ).replace("</edmx:DataServices>", &format!("<Schema {conflicting} xmlns=\"http://docs.oasis-open.org/odata/ns/edm\"></Schema></edmx:DataServices>"));
+        fs::write(app.path().join("specs/model.csdl.xml"), xml).unwrap();
+        let error =
+            verify_specs(&app).expect_err("ambiguous qualifier must not pick a namespace silently");
+        assert!(
+            error
+                .to_string()
+                .contains("ambiguous CSDL namespace or alias"),
+            "{error:#}"
+        );
+    }
+}
