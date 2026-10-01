@@ -56,5 +56,5 @@ pub(crate) fn run(source: &Path) -> Result<()> {
     }
     anyhow::ensure!(entities > 0, "source contains no IOA specifications");
     temper_authz::AuthzEngine::new(&policies).context("invalid Cedar policy")?;
-    super::run(specs.to_str().context("non-UTF8 specs path")?)
+    super::run_specs(&specs, true)
 }

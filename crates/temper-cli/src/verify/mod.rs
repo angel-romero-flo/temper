@@ -1,6 +1,6 @@
 //! Verification cascade command for `temper verify`.
 //!
-//! Loads CSDL and IOA, runs the verification cascade, and rejects incomplete proofs.
+//! Shared specification verification, with strict checks for complete applications.
 
 use std::fs;
 use std::path::Path;
@@ -17,10 +17,14 @@ use input::read_ioa_sources;
 /// Run the `temper verify` command.
 ///
 /// Loads specs from the given directory, builds the spec model, and reports
-/// validation results. Failed or incomplete verification returns an error.
+/// validation results. Complete applications use `verify-app` for packaging checks.
 pub fn run(specs_dir: &str) -> Result<()> {
-    let specs_path = Path::new(specs_dir);
+    run_specs(Path::new(specs_dir), false)
+}
 
+/// Application mode requires a complete model and a complete cross-entity proof.
+/// Directory mode also serves partial collections of independent specification fixtures.
+fn run_specs(specs_path: &Path, application: bool) -> Result<()> {
     println!("Running verification cascade...");
     println!("  Specs directory: {}", specs_path.display());
 
@@ -35,16 +39,22 @@ pub fn run(specs_dir: &str) -> Result<()> {
 
     let csdl_xml = fs::read_to_string(&csdl_path)
         .with_context(|| format!("Failed to read {}", csdl_path.display()))?;
-    input::validate_xml_document(&csdl_xml)?;
+    if application {
+        input::validate_xml_document(&csdl_xml)?;
+    }
     let csdl = parse_csdl(&csdl_xml)
         .with_context(|| format!("Failed to parse CSDL from {}", csdl_path.display()))?;
 
-    anyhow::ensure!(!csdl.schemas.is_empty(), "CSDL must contain a Schema");
+    if application {
+        anyhow::ensure!(!csdl.schemas.is_empty(), "CSDL must contain a Schema");
+    }
 
     // Read IOA TOML specs (preferred) and TLA+ specs (legacy)
-    let ioa_sources = read_ioa_sources(specs_path)?;
+    let ioa_sources = read_ioa_sources(specs_path, application)?;
     let tla_sources = read_tla_sources(specs_path)?;
-    input::validate_ioa_entities(&csdl, &ioa_sources)?;
+    if application {
+        input::validate_ioa_entities(&csdl, &ioa_sources)?;
+    }
 
     // Run IOA verification cascade if IOA files found
     if !ioa_sources.is_empty() {
@@ -134,7 +144,7 @@ pub fn run(specs_dir: &str) -> Result<()> {
         // only meaningful with two or more entities — a single spec has nothing
         // to compose (and stdin verification stays per-entity by design).
         if parsed_automata.len() >= 2 {
-            run_composite_verification(&parsed_automata)?;
+            run_composite_verification(&parsed_automata, application)?;
         }
     }
 
@@ -203,9 +213,10 @@ pub fn run(specs_dir: &str) -> Result<()> {
 /// of the entity trigger graph (so every entity is covered), checks the
 /// `no_dropped_reaction` property, and reports every dropped reaction with
 /// enough detail to name it. A dropped reaction GATES — it fails the command.
-/// An INCOMPLETE run (budget exhausted) fails the command.
+/// An INCOMPLETE run (budget exhausted) fails complete-application verification.
 fn run_composite_verification(
     parsed_automata: &std::collections::BTreeMap<String, temper_spec::automaton::Automaton>,
+    application: bool,
 ) -> Result<()> {
     use temper_verify::composite::verify_all;
 
@@ -214,11 +225,12 @@ fn run_composite_verification(
 
     println!("\nRunning composite cross-entity verification (ADR-0150)...");
     let results = verify_all(&automaton_refs);
-    report_composite_results(&results)
+    report_composite_results(&results, application)
 }
 
 fn report_composite_results(
     results: &[temper_verify::composite::CompositeVerifyResult],
+    application: bool,
 ) -> Result<()> {
     use temper_verify::composite::CompositeOutcome;
 
@@ -280,7 +292,12 @@ fn report_composite_results(
         );
     }
     if any_incomplete {
-        anyhow::bail!("composite verification incomplete: state exploration budget exhausted");
+        if application {
+            anyhow::bail!("composite verification incomplete: state exploration budget exhausted");
+        }
+        println!(
+            "\nComposite cross-entity verification: INCOMPLETE (partial proof; increase budget to complete)"
+        );
     } else {
         println!("\nComposite cross-entity verification: ALL PASSED");
     }

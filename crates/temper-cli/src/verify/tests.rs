@@ -2,22 +2,8 @@ use super::*;
 
 #[test]
 fn test_verify_reference_specs() {
-    let fixtures = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../test-fixtures/specs"
-    ));
-    let app = tempfile::tempdir().expect("tempdir");
-    // The fixture directory also holds unrelated examples and two alternative
-    // Process definitions. Only Order and Directory belong to this CSDL model.
-    for file in [
-        "model.csdl.xml",
-        "order.ioa.toml",
-        "order.tla",
-        "directory.ioa.toml",
-    ] {
-        fs::copy(fixtures.join(file), app.path().join(file)).expect("copy application fixture");
-    }
-    run(app.path().to_str().unwrap()).expect("verify should pass on reference application");
+    let specs_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-fixtures/specs");
+    run(specs_dir).expect("standalone specification fixtures should pass");
 }
 
 #[test]

@@ -61,7 +61,7 @@ fn application() -> TempDir {
 }
 
 fn verify_specs(app: &TempDir) -> Result<()> {
-    run(app.path().join("specs").to_str().unwrap())
+    run_specs(&app.path().join("specs"), true)
 }
 
 #[test]
@@ -136,8 +136,9 @@ fn exhausted_real_composite_verification_fails_the_command() {
     let automaton = temper_spec::automaton::parse_automaton(IOA).unwrap();
     let result = verify_composite_with_budget(&[&automaton], "Counter", 1).unwrap();
     assert_eq!(result.outcome, CompositeOutcome::Incomplete);
+    assert!(report_composite_results(std::slice::from_ref(&result), false).is_ok());
     assert!(
-        report_composite_results(&[result])
+        report_composite_results(&[result], true)
             .unwrap_err()
             .to_string()
             .contains("incomplete")

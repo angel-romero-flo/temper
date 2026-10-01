@@ -28,7 +28,10 @@ pub(super) fn validate_ioa_entities(
 }
 
 /// Read all `.ioa.toml` files from the specs directory.
-pub(super) fn read_ioa_sources(specs_dir: &Path) -> Result<BTreeMap<String, String>> {
+pub(super) fn read_ioa_sources(
+    specs_dir: &Path,
+    application: bool,
+) -> Result<BTreeMap<String, String>> {
     let mut sources = BTreeMap::new();
 
     if !specs_dir.is_dir() {
@@ -50,8 +53,15 @@ pub(super) fn read_ioa_sources(specs_dir: &Path) -> Result<BTreeMap<String, Stri
             let source = fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read IOA file: {}", path.display()))?;
 
-            let automaton = temper_spec::automaton::parse_automaton(&source)?;
-            let entity_name = automaton.automaton.name;
+            let entity_name = if application {
+                temper_spec::automaton::parse_automaton(&source)?
+                    .automaton
+                    .name
+            } else {
+                // Standalone fixture collections may contain several alternative
+                // definitions of one entity; retain their distinct file identities.
+                crate::util::to_pascal_case(file_name.trim_end_matches(".ioa.toml"))
+            };
             anyhow::ensure!(
                 sources.insert(entity_name.clone(), source).is_none(),
                 "duplicate entity {entity_name}"
