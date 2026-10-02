@@ -36,9 +36,9 @@ pub async fn bearer_auth_check(
     let bearer = bearer_credential(&req);
     let tenant = requested_tenant(&req)?;
 
-    if let Some(HostVerifiedIdentity(identity)) = req.extensions_mut().remove() {
+    if let Some(identity) = req.extensions_mut().remove::<HostVerifiedIdentity>() {
+        let authenticated = identity.into_request_context(tenant, req.headers());
         req.headers_mut().remove("authorization");
-        let authenticated = temper_authz::AuthenticatedRequestContext::new(tenant, identity);
         req.extensions_mut().insert(authenticated);
         return Ok(next.run(req).await);
     }
