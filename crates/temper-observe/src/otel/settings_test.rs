@@ -101,6 +101,15 @@ fn entries_that_are_not_key_value_are_ignored_with_one_warning() {
 }
 
 #[test]
+fn a_single_malformed_entry_is_reported_in_the_singular() {
+    let settings = settings(&[(RESOURCE_ATTRIBUTES_ENV, "a=1,oops")]);
+    assert_eq!(
+        settings.warnings(),
+        ["OTEL_RESOURCE_ATTRIBUTES has 1 entry that is not key=value; it is ignored"]
+    );
+}
+
+#[test]
 fn computed_attributes_win_over_resource_attributes() {
     let settings = settings(&[(
         RESOURCE_ATTRIBUTES_ENV,
