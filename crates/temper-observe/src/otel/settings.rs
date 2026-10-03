@@ -14,6 +14,9 @@ use super::config::read_non_empty_env;
 
 const SERVICE_NAME_ENV: &str = "OTEL_SERVICE_NAME";
 const RESOURCE_ATTRIBUTES_ENV: &str = "OTEL_RESOURCE_ATTRIBUTES";
+const TRACES_EXPORTER_ENV: &str = "OTEL_TRACES_EXPORTER";
+const METRICS_EXPORTER_ENV: &str = "OTEL_METRICS_EXPORTER";
+const LOGS_EXPORTER_ENV: &str = "OTEL_LOGS_EXPORTER";
 
 /// Resource attributes the server computes itself. They win over
 /// `OTEL_RESOURCE_ATTRIBUTES`.
@@ -27,11 +30,51 @@ pub(super) struct ComputedAttributes {
     pub(super) runtime_id: String,
 }
 
+/// Which signals are exported. All of them unless the operator switches one
+/// off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Signals {
+    pub(super) traces: bool,
+    pub(super) metrics: bool,
+    pub(super) logs: bool,
+}
+
+impl Default for Signals {
+    fn default() -> Self {
+        Self {
+            traces: true,
+            metrics: true,
+            logs: true,
+        }
+    }
+}
+
+impl Signals {
+    /// The exported signals for the startup log line, for example
+    /// `traces + metrics + logs`.
+    pub(super) fn label(self) -> String {
+        let exported: Vec<&str> = [
+            ("traces", self.traces),
+            ("metrics", self.metrics),
+            ("logs", self.logs),
+        ]
+        .into_iter()
+        .filter_map(|(signal, on)| on.then_some(signal))
+        .collect();
+        if exported.is_empty() {
+            "no signals".to_string()
+        } else {
+            exported.join(" + ")
+        }
+    }
+}
+
 /// What the operator asked for through the standard variables.
 #[derive(Clone, Debug, Default)]
 pub(super) struct ExportSettings {
     service_name: Option<String>,
     resource_attributes: BTreeMap<String, String>,
+    signals: Signals,
     warnings: Vec<String>,
 }
 
@@ -52,7 +95,31 @@ impl ExportSettings {
         if let Some(raw) = lookup(RESOURCE_ATTRIBUTES_ENV) {
             settings.read_resource_attributes(&raw);
         }
+        settings.signals = Signals {
+            traces: settings.read_exporter(TRACES_EXPORTER_ENV, &lookup),
+            metrics: settings.read_exporter(METRICS_EXPORTER_ENV, &lookup),
+            logs: settings.read_exporter(LOGS_EXPORTER_ENV, &lookup),
+        };
         settings
+    }
+
+    /// Whether the signal behind an `OTEL_*_EXPORTER` variable is exported.
+    /// `none` switches it off; unset or `otlp` exports it. OTLP is the only
+    /// exporter there is, so any other value is reported and exported as
+    /// `otlp`.
+    fn read_exporter(&mut self, variable: &str, lookup: &impl Fn(&str) -> Option<String>) -> bool {
+        let Some(value) = lookup(variable) else {
+            return true;
+        };
+        if value.eq_ignore_ascii_case("none") {
+            return false;
+        }
+        if !value.eq_ignore_ascii_case("otlp") {
+            self.warnings.push(format!(
+                "{variable}={value} is not supported (expected otlp or none); exporting as otlp"
+            ));
+        }
+        true
     }
 
     /// `OTEL_RESOURCE_ATTRIBUTES` is a comma-separated list of `key=value`
@@ -123,6 +190,11 @@ impl ExportSettings {
             .build()
     }
 
+    /// Which signals to build an exporter for.
+    pub(super) fn signals(&self) -> Signals {
+        self.signals
+    }
+
     /// Problems found in the settings, to report once at startup.
     pub(super) fn warnings(&self) -> &[String] {
         &self.warnings
@@ -130,117 +202,5 @@ impl ExportSettings {
 }
 
 #[cfg(test)]
-mod tests {
-    use opentelemetry::Key;
-
-    use super::*;
-
-    fn settings(variables: &[(&str, &str)]) -> ExportSettings {
-        ExportSettings::from_lookup(|name| {
-            variables
-                .iter()
-                .find(|(variable, _)| *variable == name)
-                .map(|(_, value)| value.to_string())
-        })
-    }
-
-    fn computed() -> ComputedAttributes {
-        ComputedAttributes {
-            environment: None,
-            version: None,
-            runtime_id: "runtime-1".to_string(),
-        }
-    }
-
-    fn attribute(resource: &Resource, key: &'static str) -> Option<String> {
-        resource
-            .get(&Key::from_static_str(key))
-            .map(|value| value.to_string())
-    }
-
-    #[test]
-    fn nothing_set_gives_the_built_in_resource_and_no_warnings() {
-        let settings = settings(&[]);
-        let resource = settings.resource("built-in", computed());
-        assert_eq!(resource.len(), 2);
-        assert_eq!(
-            attribute(&resource, "service.name").as_deref(),
-            Some("built-in")
-        );
-        assert_eq!(
-            attribute(&resource, "runtime-id").as_deref(),
-            Some("runtime-1")
-        );
-        assert!(settings.warnings().is_empty());
-    }
-
-    #[test]
-    fn resource_attributes_are_trimmed_and_the_last_duplicate_wins() {
-        let settings = settings(&[(RESOURCE_ATTRIBUTES_ENV, " a = 1 ,b=2,a=3,empty=,")]);
-        let resource = settings.resource("built-in", computed());
-        assert_eq!(attribute(&resource, "a").as_deref(), Some("3"));
-        assert_eq!(attribute(&resource, "b").as_deref(), Some("2"));
-        assert_eq!(attribute(&resource, "empty").as_deref(), Some(""));
-        assert!(settings.warnings().is_empty());
-    }
-
-    #[test]
-    fn entries_that_are_not_key_value_are_ignored_with_one_warning() {
-        let settings = settings(&[(RESOURCE_ATTRIBUTES_ENV, "a=1,token-without-key,=x,b=2")]);
-        let resource = settings.resource("built-in", computed());
-        assert_eq!(attribute(&resource, "a").as_deref(), Some("1"));
-        assert_eq!(attribute(&resource, "b").as_deref(), Some("2"));
-        assert_eq!(resource.len(), 4);
-        let [warning] = settings.warnings() else {
-            panic!("expected one warning, got {:?}", settings.warnings());
-        };
-        assert!(warning.contains("OTEL_RESOURCE_ATTRIBUTES has 2 entries"));
-        assert!(!warning.contains("token-without-key"));
-    }
-
-    #[test]
-    fn computed_attributes_win_over_resource_attributes() {
-        let settings = settings(&[(
-            RESOURCE_ATTRIBUTES_ENV,
-            "service.name=x,deployment.environment.name=x,service.version=x,runtime-id=x",
-        )]);
-        let resource = settings.resource(
-            "built-in",
-            ComputedAttributes {
-                environment: Some("prod".to_string()),
-                version: Some("1.0".to_string()),
-                runtime_id: "runtime-1".to_string(),
-            },
-        );
-        assert_eq!(
-            attribute(&resource, "service.name").as_deref(),
-            Some("built-in")
-        );
-        assert_eq!(
-            attribute(&resource, "deployment.environment.name").as_deref(),
-            Some("prod")
-        );
-        assert_eq!(
-            attribute(&resource, "service.version").as_deref(),
-            Some("1.0")
-        );
-        assert_eq!(
-            attribute(&resource, "runtime-id").as_deref(),
-            Some("runtime-1")
-        );
-    }
-
-    #[test]
-    fn service_name_variable_replaces_the_built_in_name() {
-        let settings = settings(&[
-            (SERVICE_NAME_ENV, "orders-eu"),
-            (RESOURCE_ATTRIBUTES_ENV, "service.name=x"),
-        ]);
-        assert_eq!(settings.service_name("built-in"), "orders-eu");
-        let resource = settings.resource("built-in", computed());
-        assert_eq!(
-            attribute(&resource, "service.name").as_deref(),
-            Some("orders-eu")
-        );
-    }
-}
+#[path = "settings_test.rs"]
+mod tests;

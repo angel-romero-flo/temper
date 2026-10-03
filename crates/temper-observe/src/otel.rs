@@ -275,25 +275,11 @@ fn init_pipeline(
     };
     let resource = settings.resource(service_name, computed);
 
+    // A signal switched off keeps its provider and gets no exporter, so the
+    // rest of the process sees the same tracer, meter and logger either way.
+    let signals = settings.signals();
+
     // --- Traces ---
-    let span_exporter = build_with_retry("trace exporter", || {
-        SpanExporter::builder()
-            .with_http()
-            .with_timeout(Duration::from_secs(10))
-            .build()
-    })?;
-
-    let trace_queue = queue_size_from_env("TEMPER_TRACE_QUEUE_SIZE", TRACE_BATCH_MAX_QUEUE_SIZE);
-    let trace_batch_config = SpanBatchConfigBuilder::default()
-        .with_max_queue_size(trace_queue)
-        .with_max_export_batch_size(TRACE_BATCH_MAX_EXPORT_BATCH_SIZE)
-        .with_scheduled_delay(Duration::from_millis(TRACE_BATCH_SCHEDULE_DELAY_MS))
-        .build();
-
-    let trace_batch_processor = BatchSpanProcessor::builder(span_exporter)
-        .with_batch_config(trace_batch_config)
-        .build();
-
     // ADR-0052 hygiene: drop known-noisy span names at ingestion.
     let trace_sampler_config = TraceSamplerConfig::from_env();
     let sampler = NameBasedSampler {
@@ -301,59 +287,79 @@ fn init_pipeline(
         config: trace_sampler_config.clone(),
     };
 
-    let tracer_provider = SdkTracerProvider::builder()
-        .with_span_processor(trace_batch_processor)
+    let trace_queue = queue_size_from_env("TEMPER_TRACE_QUEUE_SIZE", TRACE_BATCH_MAX_QUEUE_SIZE);
+    let mut tracer_builder = SdkTracerProvider::builder()
         .with_sampler(sampler.clone())
-        .with_resource(resource.clone())
-        .build();
+        .with_resource(resource.clone());
+    if signals.traces {
+        let span_exporter = build_with_retry("trace exporter", || {
+            SpanExporter::builder()
+                .with_http()
+                .with_timeout(Duration::from_secs(10))
+                .build()
+        })?;
+
+        let trace_batch_config = SpanBatchConfigBuilder::default()
+            .with_max_queue_size(trace_queue)
+            .with_max_export_batch_size(TRACE_BATCH_MAX_EXPORT_BATCH_SIZE)
+            .with_scheduled_delay(Duration::from_millis(TRACE_BATCH_SCHEDULE_DELAY_MS))
+            .build();
+
+        let trace_batch_processor = BatchSpanProcessor::builder(span_exporter)
+            .with_batch_config(trace_batch_config)
+            .build();
+        tracer_builder = tracer_builder.with_span_processor(trace_batch_processor);
+    }
+    let tracer_provider = tracer_builder.build();
 
     opentelemetry::global::set_tracer_provider(tracer_provider.clone());
 
     // --- Metrics ---
-    let metric_exporter = build_with_retry("metric exporter", || {
-        MetricExporter::builder()
-            .with_http()
-            .with_timeout(Duration::from_secs(10))
-            .build()
-    })?;
+    let mut meter_builder = SdkMeterProvider::builder().with_resource(resource.clone());
+    if signals.metrics {
+        let metric_exporter = build_with_retry("metric exporter", || {
+            MetricExporter::builder()
+                .with_http()
+                .with_timeout(Duration::from_secs(10))
+                .build()
+        })?;
 
-    // Export every 30 s so metrics are visible quickly and canary gauges stay fresh.
-    let metric_reader = PeriodicReader::builder(metric_exporter)
-        .with_interval(Duration::from_secs(30))
-        .build();
-
-    let meter_provider = SdkMeterProvider::builder()
-        .with_reader(metric_reader)
-        .with_resource(resource.clone())
-        .build();
+        // Export every 30 s so metrics are visible quickly and canary gauges stay fresh.
+        let metric_reader = PeriodicReader::builder(metric_exporter)
+            .with_interval(Duration::from_secs(30))
+            .build();
+        meter_builder = meter_builder.with_reader(metric_reader);
+    }
+    let meter_provider = meter_builder.build();
 
     opentelemetry::global::set_meter_provider(meter_provider.clone());
     record_trace_sampler_config(&trace_sampler_config);
 
     // --- Logs ---
-    let log_exporter = build_with_retry("log exporter", || {
-        LogExporter::builder()
-            .with_http()
-            .with_timeout(Duration::from_secs(10))
-            .build()
-    })?;
-
     let log_queue = queue_size_from_env("TEMPER_LOG_QUEUE_SIZE", LOG_BATCH_MAX_QUEUE_SIZE);
-    let log_batch_config = LogBatchConfigBuilder::default()
-        .with_max_queue_size(log_queue)
-        .with_max_export_batch_size(LOG_BATCH_MAX_EXPORT_BATCH_SIZE)
-        .with_scheduled_delay(Duration::from_millis(LOG_BATCH_SCHEDULE_DELAY_MS))
-        .build();
+    let mut logger_builder = SdkLoggerProvider::builder().with_resource(resource);
+    if signals.logs {
+        let log_exporter = build_with_retry("log exporter", || {
+            LogExporter::builder()
+                .with_http()
+                .with_timeout(Duration::from_secs(10))
+                .build()
+        })?;
 
-    let log_batch_processor = BatchLogProcessor::builder(log_exporter)
-        .with_batch_config(log_batch_config)
-        .build();
+        let log_batch_config = LogBatchConfigBuilder::default()
+            .with_max_queue_size(log_queue)
+            .with_max_export_batch_size(LOG_BATCH_MAX_EXPORT_BATCH_SIZE)
+            .with_scheduled_delay(Duration::from_millis(LOG_BATCH_SCHEDULE_DELAY_MS))
+            .build();
 
-    let logger_provider = SdkLoggerProvider::builder()
-        .with_log_processor(EventTimeLogProcessor)
-        .with_log_processor(log_batch_processor)
-        .with_resource(resource)
-        .build();
+        let log_batch_processor = BatchLogProcessor::builder(log_exporter)
+            .with_batch_config(log_batch_config)
+            .build();
+        logger_builder = logger_builder
+            .with_log_processor(EventTimeLogProcessor)
+            .with_log_processor(log_batch_processor);
+    }
+    let logger_provider = logger_builder.build();
 
     // --- Tracing subscriber ---
     // Three layers:
@@ -377,7 +383,9 @@ fn init_pipeline(
     // Restrict the log bridge to WARN+ to avoid flooding Logfire's /v1/logs
     // endpoint with high-volume info events.  Traces already capture info-level
     // spans via the otel_trace_layer, so no diagnostic value is lost.
-    let otel_log_layer = OpenTelemetryTracingBridge::new(&logger_provider);
+    let otel_log_layer = signals
+        .logs
+        .then(|| OpenTelemetryTracingBridge::new(&logger_provider));
 
     // `.boxed()` unifies the pretty and JSON fmt layer types so a single
     // subscriber chain compiles.
@@ -420,7 +428,8 @@ fn init_pipeline(
             .unwrap_or(DISPATCH_BACKGROUND_SAMPLE_RATE_DEFAULT),
         log_queue,
         log_batch = LOG_BATCH_MAX_EXPORT_BATCH_SIZE,
-        "OTEL initialised (traces + metrics + logs)"
+        "OTEL initialised ({})",
+        signals.label()
     );
 
     Ok(OtelGuard {
