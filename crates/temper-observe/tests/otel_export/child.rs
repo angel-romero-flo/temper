@@ -11,7 +11,7 @@ use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, Tra
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::listener::{Listener, Received};
-use crate::wire::{self, LogRecord, Metric, Span};
+use crate::wire::{self, Attributes, LogRecord, Metric, Span};
 
 const SCENARIO_ENV: &str = "OTEL_EXPORT_TEST_SCENARIO";
 
@@ -57,6 +57,29 @@ impl Run {
             .last()
             .map(wire::metrics)
             .unwrap_or_default()
+    }
+
+    /// The resource each signal was exported under: one entry per signal
+    /// that reached the listener. A signal sent under more than one resource
+    /// is a failure.
+    pub fn resources(&self) -> Vec<(&'static str, Attributes)> {
+        let traces = self.spans().into_iter().map(|span| span.resource);
+        let metrics = self.metrics().into_iter().map(|metric| metric.resource);
+        let logs = self.logs().into_iter().map(|record| record.resource);
+        let mut out = Vec::new();
+        for (signal, mut resources) in [
+            ("traces", traces.collect::<Vec<_>>()),
+            ("metrics", metrics.collect()),
+            ("logs", logs.collect()),
+        ] {
+            resources.dedup();
+            assert!(
+                resources.len() <= 1,
+                "{signal} were exported under more than one resource: {resources:?}"
+            );
+            out.extend(resources.into_iter().map(|resource| (signal, resource)));
+        }
+        out
     }
 
     /// Number of requests the listener received on `path`.

@@ -22,11 +22,9 @@
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use opentelemetry::KeyValue;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::{LogExporter, MetricExporter, SpanExporter, WithExportConfig};
-use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::{
     BatchConfigBuilder as LogBatchConfigBuilder, BatchLogProcessor, SdkLoggerProvider,
 };
@@ -40,6 +38,7 @@ use tracing_subscriber::prelude::*;
 mod config;
 mod log_time;
 mod sampler;
+mod settings;
 
 use config::{
     parse_otlp_headers, read_non_empty_env, resolve_deployment_environment, resolve_otel_config,
@@ -50,6 +49,7 @@ use sampler::{
     DISPATCH_BACKGROUND_SAMPLE_RATE_DEFAULT, NameBasedSampler, TraceSamplerConfig,
     WASM_AUXILIARY_SAMPLE_RATE_DEFAULT, record_trace_sampler_config,
 };
+use settings::{ComputedAttributes, ExportSettings};
 
 const OTEL_EXPORTER_BUILD_RETRY_ATTEMPTS: usize = 3;
 const OTEL_EXPORTER_RETRY_BASE_DELAY_MS: u64 = 250;
@@ -170,13 +170,14 @@ pub fn init_observability(service_name: &str) -> Option<OtelGuard> {
         config.logfire_token.is_some(),
     );
 
-    match init_tracing(&config.endpoint, service_name) {
+    let settings = ExportSettings::from_env();
+    match init_pipeline(&config.endpoint, service_name, &settings) {
         Ok(guard) => {
             tracing::info!(
                 endpoint = %config.endpoint,
                 endpoint_source = config.endpoint_source.as_str(),
                 logfire_auth = config.logfire_token.is_some(),
-                service_name,
+                service_name = settings.service_name(service_name),
                 "OTEL export pipeline active",
             );
             Some(guard)
@@ -198,6 +199,16 @@ pub fn init_tracing(
     endpoint: &str,
     service_name: &str,
 ) -> Result<OtelGuard, Box<dyn std::error::Error>> {
+    init_pipeline(endpoint, service_name, &ExportSettings::from_env())
+}
+
+fn init_pipeline(
+    endpoint: &str,
+    service_name: &str,
+    settings: &ExportSettings,
+) -> Result<OtelGuard, Box<dyn std::error::Error>> {
+    let service_name = settings.service_name(service_name);
+
     // Build auth headers (Logfire or custom).
     let mut headers = read_non_empty_env("OTEL_EXPORTER_OTLP_HEADERS")
         .map(|raw| parse_otlp_headers(&raw))
@@ -251,20 +262,18 @@ pub fn init_tracing(
         }
     }
 
-    let mut resource_attrs = vec![KeyValue::new("service.name", service_name.to_string())];
-    if let Some(environment) = resolve_deployment_environment() {
-        resource_attrs.push(KeyValue::new("deployment.environment.name", environment));
-    }
-    if let Some(version) = resolve_service_version() {
-        resource_attrs.push(KeyValue::new("service.version", version));
-    }
+    let environment = resolve_deployment_environment();
+    let version = resolve_service_version();
     // ADR-0055: runtime-id enables Datadog Profiler ↔ APM trace stitching.
     // Generated once at process start; regenerates only on restart.
     // determinism-ok: observability-only identifier, not a simulation variable.
-    resource_attrs.push(KeyValue::new("runtime-id", runtime_id().to_string()));
-    let resource = Resource::builder_empty()
-        .with_attributes(resource_attrs)
-        .build();
+    let runtime_id = runtime_id().to_string();
+    let computed = ComputedAttributes {
+        environment,
+        version,
+        runtime_id,
+    };
+    let resource = settings.resource(service_name, computed);
 
     // --- Traces ---
     let span_exporter = build_with_retry("trace exporter", || {
@@ -393,6 +402,10 @@ pub fn init_tracing(
         .map_err(|e| {
             std::io::Error::other(format!("failed to initialize tracing subscriber: {e}"))
         })?;
+
+    for warning in settings.warnings() {
+        tracing::warn!("OTEL export setting: {warning}");
+    }
 
     tracing::info!(
         endpoint,
