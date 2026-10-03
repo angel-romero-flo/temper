@@ -51,14 +51,14 @@ span "wasm:workspace_fs.read" scope=temper trace=[000000000000000000000000000000
   attribute thread.id = "<masked>"
   attribute thread.name = "<masked>"
 == logs ==
-log "test log inside a span" scope=otel_export::child severity=INFO(9) time=<zero> observed=<set> trace=[] span=[]
+log "test log inside a span" scope=otel_export::child severity=INFO(9) time=<observed time> observed=<set> trace=[] span=[]
   resource runtime-id = "<masked>"
   resource service.name = "temper-platform"
   attribute detail = "inside"
-log "test log outside a span" scope=otel_export::child severity=WARN(13) time=<zero> observed=<set> trace=[] span=[]
+log "test log outside a span" scope=otel_export::child severity=WARN(13) time=<observed time> observed=<set> trace=[] span=[]
   resource runtime-id = "<masked>"
   resource service.name = "temper-platform"
-log "OTEL initialised (traces + metrics + logs)" scope=temper_observe::otel severity=INFO(9) time=<zero> observed=<set> trace=[] span=[]
+log "OTEL initialised (traces + metrics + logs)" scope=temper_observe::otel severity=INFO(9) time=<observed time> observed=<set> trace=[] span=[]
   resource runtime-id = "<masked>"
   resource service.name = "temper-platform"
   attribute endpoint = "http://127.0.0.1:<port>"
@@ -69,7 +69,7 @@ log "OTEL initialised (traces + metrics + logs)" scope=temper_observe::otel seve
   attribute trace_dispatch_background_sample_pct = "25"
   attribute trace_queue = "2048"
   attribute trace_wasm_auxiliary_sample_pct = "5"
-log "OTEL export pipeline active" scope=temper_observe::otel severity=INFO(9) time=<zero> observed=<set> trace=[] span=[]
+log "OTEL export pipeline active" scope=temper_observe::otel severity=INFO(9) time=<observed time> observed=<set> trace=[] span=[]
   resource runtime-id = "<masked>"
   resource service.name = "temper-platform"
   attribute endpoint = "http://127.0.0.1:<port>"

@@ -38,3 +38,24 @@ fn default_export_matches_recorded_baseline() {
          --- recorded ({BASELINE_PATH})\n{expected}\n--- actual\n{actual}"
     );
 }
+
+/// Every exported log record carries an event time. A backend that dates
+/// records by their event time treats a record without one as very old.
+#[test]
+fn every_log_record_has_an_event_time() {
+    let run = child::run("default", &[]);
+    let records = run.logs();
+    assert!(!records.is_empty(), "no log records were exported");
+    for record in records {
+        assert_ne!(
+            record.time_unix_nano, 0,
+            "log record {:?} was exported with an event time of zero",
+            record.body
+        );
+        assert_eq!(
+            record.time_unix_nano, record.observed_time_unix_nano,
+            "log record {:?} has an event time that is not its observed time",
+            record.body
+        );
+    }
+}

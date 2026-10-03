@@ -38,12 +38,14 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
 
 mod config;
+mod log_time;
 mod sampler;
 
 use config::{
     parse_otlp_headers, read_non_empty_env, resolve_deployment_environment, resolve_otel_config,
     resolve_service_version,
 };
+use log_time::EventTimeLogProcessor;
 use sampler::{
     DISPATCH_BACKGROUND_SAMPLE_RATE_DEFAULT, NameBasedSampler, TraceSamplerConfig,
     WASM_AUXILIARY_SAMPLE_RATE_DEFAULT, record_trace_sampler_config,
@@ -339,6 +341,7 @@ pub fn init_tracing(
         .build();
 
     let logger_provider = SdkLoggerProvider::builder()
+        .with_log_processor(EventTimeLogProcessor)
         .with_log_processor(log_batch_processor)
         .with_resource(resource)
         .build();
