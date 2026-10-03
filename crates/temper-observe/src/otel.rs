@@ -18,6 +18,14 @@
 //! | `RUST_LOG` | Log level filter (default: `info`) |
 //! | `TEMPER_TRACE_QUEUE_SIZE` | Max buffered spans before drop (default: 2048, range: 128–32768) |
 //! | `TEMPER_LOG_QUEUE_SIZE` | Max buffered log records before drop (default: 2048, range: 128–32768) |
+//! | `OTEL_SERVICE_NAME` | Service name to export under (default: the name built into the binary) |
+//! | `OTEL_RESOURCE_ATTRIBUTES` | Extra resource attributes as `key=value,...` (default: none); attributes the server computes itself win |
+//! | `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` | `none` switches that signal's export off (default: `otlp`) |
+//! | `OTEL_TRACES_SAMPLER` | `always_on`, `always_off`, `traceidratio`, `parentbased_always_on`, `parentbased_always_off` or `parentbased_traceidratio` (default: `parentbased_always_on`) |
+//! | `OTEL_TRACES_SAMPLER_ARG` | Ratio from 0 to 1 for the two ratio samplers (default: 1) |
+//!
+//! A value that is not supported never stops the server: it is logged once at
+//! startup as a warning and the default applies.
 
 use std::sync::OnceLock;
 use std::time::Duration;
