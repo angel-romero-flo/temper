@@ -30,7 +30,7 @@ use opentelemetry_sdk::logs::{
 };
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::{
-    BatchConfigBuilder as SpanBatchConfigBuilder, BatchSpanProcessor, Sampler, SdkTracerProvider,
+    BatchConfigBuilder as SpanBatchConfigBuilder, BatchSpanProcessor, SdkTracerProvider,
 };
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::prelude::*;
@@ -283,7 +283,7 @@ fn init_pipeline(
     // ADR-0052 hygiene: drop known-noisy span names at ingestion.
     let trace_sampler_config = TraceSamplerConfig::from_env();
     let sampler = NameBasedSampler {
-        inner: Sampler::ParentBased(Box::new(Sampler::AlwaysOn)),
+        inner: settings.sampler(),
         config: trace_sampler_config.clone(),
     };
 
@@ -413,6 +413,9 @@ fn init_pipeline(
 
     for warning in settings.warnings() {
         tracing::warn!("OTEL export setting: {warning}");
+    }
+    if let Some(sampler) = settings.chosen_sampler() {
+        tracing::info!(?sampler, "OTEL trace sampler set by OTEL_TRACES_SAMPLER");
     }
 
     tracing::info!(
