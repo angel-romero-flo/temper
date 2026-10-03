@@ -36,7 +36,7 @@ const BASELINE_PATH: &str = concat!(
 /// `UPDATE_OTEL_EXPORT_BASELINE=1` and review the diff of the baseline file.
 #[test]
 fn default_export_matches_recorded_baseline() {
-    let run = child::run("default", &[]);
+    let run = child::run(&[]);
     for path in ["/v1/traces", "/v1/metrics", "/v1/logs"] {
         assert!(run.requests_to(path) > 0, "no export reached {path}");
     }
@@ -58,7 +58,7 @@ fn default_export_matches_recorded_baseline() {
 /// records by their event time treats a record without one as very old.
 #[test]
 fn every_log_record_has_an_event_time() {
-    let run = child::run("default", &[]);
+    let run = child::run(&[]);
     let records = run.logs();
     assert!(!records.is_empty(), "no log records were exported");
     for record in records {
@@ -78,7 +78,7 @@ fn every_log_record_has_an_event_time() {
 /// `OTEL_SERVICE_NAME` replaces the built-in service name on every signal.
 #[test]
 fn service_name_follows_otel_service_name() {
-    let run = child::run("default", &[("OTEL_SERVICE_NAME", "orders-eu")]);
+    let run = child::run(&[("OTEL_SERVICE_NAME", "orders-eu")]);
     for (signal, resource) in resources_of_all_signals(&run) {
         assert_eq!(
             attribute(&resource, "service.name"),
@@ -91,7 +91,7 @@ fn service_name_follows_otel_service_name() {
 /// Without `OTEL_SERVICE_NAME` the service name is the built-in one.
 #[test]
 fn service_name_is_built_in_when_unset() {
-    let run = child::run("default", &[]);
+    let run = child::run(&[]);
     for (signal, resource) in resources_of_all_signals(&run) {
         assert_eq!(
             attribute(&resource, "service.name"),
@@ -105,7 +105,7 @@ fn service_name_is_built_in_when_unset() {
 /// next to what the server computes itself.
 #[test]
 fn resource_attributes_are_merged_on_every_signal() {
-    let run = child::run("default", &[("OTEL_RESOURCE_ATTRIBUTES", "a=1,b=2")]);
+    let run = child::run(&[("OTEL_RESOURCE_ATTRIBUTES", "a=1,b=2")]);
     for (signal, resource) in resources_of_all_signals(&run) {
         assert_eq!(attribute(&resource, "a"), Some("1"), "a on {signal}");
         assert_eq!(attribute(&resource, "b"), Some("2"), "b on {signal}");
@@ -124,18 +124,15 @@ fn resource_attributes_are_merged_on_every_signal() {
 /// variables are set, and the service name unless `OTEL_SERVICE_NAME` is set.
 #[test]
 fn computed_resource_attributes_keep_precedence() {
-    let run = child::run(
-        "default",
-        &[
-            (
-                "OTEL_RESOURCE_ATTRIBUTES",
-                "runtime-id=from-attributes,deployment.environment.name=from-attributes,\
+    let run = child::run(&[
+        (
+            "OTEL_RESOURCE_ATTRIBUTES",
+            "runtime-id=from-attributes,deployment.environment.name=from-attributes,\
                  service.version=from-attributes,service.name=from-attributes,team=storage",
-            ),
-            ("DD_ENV", "from-env-variable"),
-            ("DD_VERSION", "from-version-variable"),
-        ],
-    );
+        ),
+        ("DD_ENV", "from-env-variable"),
+        ("DD_VERSION", "from-version-variable"),
+    ]);
     for (signal, resource) in resources_of_all_signals(&run) {
         let expect = |key: &str, value: &str| {
             assert_eq!(attribute(&resource, key), Some(value), "{key} on {signal}");
@@ -157,16 +154,13 @@ fn computed_resource_attributes_keep_precedence() {
 /// `service.name` given there.
 #[test]
 fn resource_attributes_supply_what_has_no_variable_of_its_own() {
-    let run = child::run(
-        "default",
-        &[
-            (
-                "OTEL_RESOURCE_ATTRIBUTES",
-                "deployment.environment.name=staging, service.version = 1.2.3 ,service.name=ignored",
-            ),
-            ("OTEL_SERVICE_NAME", "orders-eu"),
-        ],
-    );
+    let run = child::run(&[
+        (
+            "OTEL_RESOURCE_ATTRIBUTES",
+            "deployment.environment.name=staging, service.version = 1.2.3 ,service.name=ignored",
+        ),
+        ("OTEL_SERVICE_NAME", "orders-eu"),
+    ]);
     for (signal, resource) in resources_of_all_signals(&run) {
         let expect = |key: &str, value: &str| {
             assert_eq!(attribute(&resource, key), Some(value), "{key} on {signal}");
@@ -182,7 +176,7 @@ const SIGNAL_PATHS: [&str; 3] = ["/v1/traces", "/v1/metrics", "/v1/logs"];
 /// With `variable` set to `none`, nothing reaches `silent_path`, the other
 /// two signals are still exported, and the process logs as before.
 fn assert_only_one_signal_is_off(variable: &str, silent_path: &str, exported: &str) {
-    let run = child::run("default", &[(variable, "none")]);
+    let run = child::run(&[(variable, "none")]);
     let messages = log_messages(&run);
     for expected in [
         format!("OTEL initialised ({exported})").as_str(),
@@ -245,14 +239,11 @@ fn logs_exporter_none_switches_only_logs_off() {
 /// variables are unset, and nothing is reported.
 #[test]
 fn exporters_set_to_otlp_export_as_by_default() {
-    let run = child::run(
-        "default",
-        &[
-            ("OTEL_TRACES_EXPORTER", "otlp"),
-            ("OTEL_METRICS_EXPORTER", "OTLP"),
-            ("OTEL_LOGS_EXPORTER", " otlp "),
-        ],
-    );
+    let run = child::run(&[
+        ("OTEL_TRACES_EXPORTER", "otlp"),
+        ("OTEL_METRICS_EXPORTER", "OTLP"),
+        ("OTEL_LOGS_EXPORTER", " otlp "),
+    ]);
     let expected = std::fs::read_to_string(BASELINE_PATH).expect("read the baseline");
     assert!(
         render::render(&run) == expected,
@@ -301,7 +292,7 @@ const SPANS_WITH_A_SAMPLED_CALLER: [&str; 2] = ["test.sampled_caller", "wasm:wor
 /// produces a span, and the span keeps the caller's trace ID.
 #[test]
 fn always_on_records_a_request_marked_not_sampled() {
-    let run = child::run("default", &[("OTEL_TRACES_SAMPLER", "always_on")]);
+    let run = child::run(&[("OTEL_TRACES_SAMPLER", "always_on")]);
     let spans = exported_spans(&run);
     assert!(
         spans.contains(&(
@@ -316,31 +307,25 @@ fn always_on_records_a_request_marked_not_sampled() {
 /// With the sampler unset, a request marked "not sampled" produces no span.
 #[test]
 fn default_sampler_follows_a_caller_that_did_not_sample() {
-    let run = child::run("default", &[]);
+    let run = child::run(&[]);
     assert_eq!(span_names(&run), SPANS_FOLLOWING_THE_CALLER);
 }
 
 #[test]
 fn traceidratio_zero_exports_no_spans() {
-    let run = child::run(
-        "default",
-        &[
-            ("OTEL_TRACES_SAMPLER", "traceidratio"),
-            ("OTEL_TRACES_SAMPLER_ARG", "0"),
-        ],
-    );
+    let run = child::run(&[
+        ("OTEL_TRACES_SAMPLER", "traceidratio"),
+        ("OTEL_TRACES_SAMPLER_ARG", "0"),
+    ]);
     assert_eq!(span_names(&run), Vec::<String>::new());
 }
 
 #[test]
 fn traceidratio_one_exports_every_span() {
-    let run = child::run(
-        "default",
-        &[
-            ("OTEL_TRACES_SAMPLER", "traceidratio"),
-            ("OTEL_TRACES_SAMPLER_ARG", "1"),
-        ],
-    );
+    let run = child::run(&[
+        ("OTEL_TRACES_SAMPLER", "traceidratio"),
+        ("OTEL_TRACES_SAMPLER_ARG", "1"),
+    ]);
     assert_eq!(span_names(&run), EVERY_SPAN);
 }
 
@@ -366,13 +351,10 @@ fn every_sampler_keeps_the_name_based_filter() {
         ),
     ];
     for (sampler, arg, expected) in cases {
-        let run = child::run(
-            "default",
-            &[
-                ("OTEL_TRACES_SAMPLER", sampler),
-                ("OTEL_TRACES_SAMPLER_ARG", arg),
-            ],
-        );
+        let run = child::run(&[
+            ("OTEL_TRACES_SAMPLER", sampler),
+            ("OTEL_TRACES_SAMPLER_ARG", arg),
+        ]);
         let case = format!("OTEL_TRACES_SAMPLER={sampler} OTEL_TRACES_SAMPLER_ARG={arg}");
         assert_eq!(span_names(&run), expected, "{case}");
         for (name, trace_id) in exported_spans(&run) {
@@ -382,4 +364,20 @@ fn every_sampler_keeps_the_name_based_filter() {
         }
         assert_eq!(warnings(&run), Vec::<String>::new(), "{case}");
     }
+}
+
+/// Asking "is logging enabled?" through the `log` bridge, with no log line
+/// after it, must not cost the next span or log line on that thread: the
+/// export and the log lines are the same as without the question.
+#[test]
+fn log_enabled_probe_does_not_drop_the_next_span() {
+    let run = child::run_after_log_probe(&[]);
+    assert_eq!(span_names(&run), SPANS_FOLLOWING_THE_CALLER);
+    let expected = std::fs::read_to_string(BASELINE_PATH).expect("read the baseline");
+    let actual = render::render(&run);
+    assert!(
+        actual == expected,
+        "export after a log probe differs from the baseline\n\
+         --- recorded ({BASELINE_PATH})\n{expected}\n--- actual\n{actual}"
+    );
 }

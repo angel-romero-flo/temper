@@ -14,6 +14,8 @@ use crate::listener::{Listener, Received};
 use crate::wire::{self, Attributes, LogRecord, Metric, Span};
 
 const SCENARIO_ENV: &str = "OTEL_EXPORT_TEST_SCENARIO";
+const WORKLOAD: &str = "workload";
+const LOG_PROBE_THEN_WORKLOAD: &str = "log-probe-then-workload";
 
 /// Service name `temper serve` passes to the telemetry setup.
 pub const BUILT_IN_SERVICE_NAME: &str = "temper-platform";
@@ -108,7 +110,17 @@ impl Run {
 
 /// Start the telemetry setup in a child process with `env` added to a clean
 /// environment, run the workload, and collect what reached the listener.
-pub fn run(scenario: &str, env: &[(&str, &str)]) -> Run {
+pub fn run(env: &[(&str, &str)]) -> Run {
+    run_scenario(WORKLOAD, env)
+}
+
+/// Like [`run`], but the child asks the `log` bridge whether logging is
+/// enabled, and logs nothing, before it runs the workload.
+pub fn run_after_log_probe(env: &[(&str, &str)]) -> Run {
+    run_scenario(LOG_PROBE_THEN_WORKLOAD, env)
+}
+
+fn run_scenario(scenario: &str, env: &[(&str, &str)]) -> Run {
     let listener = Listener::start();
     let mut command = Command::new(std::env::current_exe().expect("path of the test binary"));
     command.args(["--exact", "child::entry", "--nocapture"]);
@@ -152,13 +164,25 @@ fn is_telemetry_variable(name: &str) -> bool {
 /// The child side. A no-op unless a parent test started this process.
 #[test]
 fn entry() {
-    if std::env::var(SCENARIO_ENV).is_err() {
+    let Ok(scenario) = std::env::var(SCENARIO_ENV) else {
         return;
-    }
+    };
     let guard = temper_observe::otel::init_observability(BUILT_IN_SERVICE_NAME)
         .expect("the OTEL pipeline must start when an endpoint is configured");
+    if scenario == LOG_PROBE_THEN_WORKLOAD {
+        probe_log_enabled();
+    }
     emit_workload();
     guard.shutdown();
+}
+
+/// Ask the `log` bridge whether logging is enabled without logging anything:
+/// once for a level and target that are enabled, once for a target the
+/// default filter turns down, and once for a level that is off.
+fn probe_log_enabled() {
+    assert!(log::log_enabled!(log::Level::Info));
+    assert!(!log::log_enabled!(target: "hyper", log::Level::Info));
+    assert!(!log::log_enabled!(log::Level::Trace));
 }
 
 /// A span named `$name` whose remote parent is the given caller.
