@@ -13,6 +13,11 @@
 //! server already holds a platform secret for is left as it is, so what the
 //! server sets for itself at start wins.
 //!
+//! A seeded secret is read like any other secret a tenant can read: a
+//! module's `get_secret` call needs a policy that permits `access_secret` on
+//! it, and a `{secret:<name>}` template in an integration config is resolved
+//! without that check. Supply this way only what every tenant's specs may use.
+//!
 //! Nothing here reads the process environment or writes to storage: the
 //! caller passes the variables in, and the secrets live in the vault's
 //! in-memory platform layer only.

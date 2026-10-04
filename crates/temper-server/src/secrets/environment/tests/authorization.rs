@@ -46,3 +46,20 @@ fn permitted_module_is_refused_a_seeded_secret_its_policy_does_not_name() {
         "{refused}"
     );
 }
+
+#[test]
+fn integration_config_template_resolves_a_seeded_secret_like_any_other() {
+    let vault = test_vault();
+    seed_platform_secrets_from_environment(&vault, vars(&[("TEMPER_SECRET_BUILD_TOKEN", "abc")]));
+    let config = std::collections::BTreeMap::from([(
+        "authorization".to_string(),
+        "Bearer {secret:build_token}".to_string(),
+    )]);
+
+    // Templates are resolved from the vault when an integration runs, for
+    // every secret the tenant can read, without the `access_secret` check
+    // that `get_secret` goes through.
+    let resolved = crate::secrets::resolve_secret_templates(&config, &vault, "tenant-b");
+
+    assert_eq!(resolved["authorization"], "Bearer abc");
+}
