@@ -1288,6 +1288,26 @@ temper serve [--port PORT] [--specs-dir DIR] [--tenant NAME]
 | `ANTHROPIC_API_KEY` | For agent mode | Claude API key |
 | `RUST_LOG` | No | Log level (default: `info,temper=debug`) |
 
+### Telemetry export settings
+
+When an OTLP endpoint is configured, these standard OpenTelemetry variables adjust what `temper serve` exports. All are optional. With none of them set, the export is unchanged.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `OTEL_SERVICE_NAME` | `temper-platform` | Service name on traces, metrics and logs. |
+| `OTEL_RESOURCE_ATTRIBUTES` | none | Extra resource attributes as `key=value,key=value`, added to traces, metrics and logs. |
+| `OTEL_TRACES_EXPORTER` | `otlp` | `none` switches the export of traces off. |
+| `OTEL_METRICS_EXPORTER` | `otlp` | `none` switches the export of metrics off. |
+| `OTEL_LOGS_EXPORTER` | `otlp` | `none` switches the export of logs off. |
+| `OTEL_TRACES_SAMPLER` | `parentbased_always_on` | Which spans are recorded: `always_on`, `always_off`, `traceidratio`, `parentbased_always_on`, `parentbased_always_off` or `parentbased_traceidratio`. |
+| `OTEL_TRACES_SAMPLER_ARG` | `1` | Ratio from 0 to 1 for `traceidratio` and `parentbased_traceidratio`. |
+
+- **Resource attributes the server computes itself win** over `OTEL_RESOURCE_ATTRIBUTES`: `runtime-id` always, `deployment.environment.name` when `DD_ENV` or `LOGFIRE_ENVIRONMENT` is set, and `service.version` when `DD_VERSION` is set. A `service.name` in `OTEL_RESOURCE_ATTRIBUTES` does not replace the service name; use `OTEL_SERVICE_NAME`. Keys and values are trimmed and otherwise taken as written.
+- **A signal that is switched off** keeps running inside the process and is not exported. Spans still carry trace context and log lines are still printed.
+- **Sampling.** The `parentbased_` samplers follow the caller's decision when a span has a remote parent. `always_on` and `traceidratio` do not, so they record spans for requests the caller marked "not sampled". The name-based filter (span names dropped outright, and prefixes kept at a reduced rate through `TEMPER_TRACE_WASM_AUX_SAMPLE_PCT` and `TEMPER_TRACE_DISPATCH_BACKGROUND_SAMPLE_PCT`) applies around whichever sampler is chosen.
+- **Bad values never stop the server.** A value that is not supported is logged once at startup as a warning (`OTEL export setting: ...`) and the default applies. An empty value is the same as an unset variable.
+- **Log records carry an event time.** Every exported log record has its event time set (to the time it was observed when it has none), so backends that date records by event time accept them.
+
 **OTEL env var precedence:** The OTEL SDK reads signal-specific env vars (`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`, `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`) *before* the generic `OTEL_EXPORTER_OTLP_ENDPOINT`. If any signal-specific var is set — even by an unrelated tool — it silently overrides Temper's configured endpoint for that signal. `init_tracing()` clears these vars automatically. See Appendix D for details.
 
 ## Appendix D: Infrastructure Pitfalls

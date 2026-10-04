@@ -7187,6 +7187,7 @@ name = "temper-observe"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "log",
  "opentelemetry",
  "opentelemetry-appender-tracing",
  "opentelemetry-otlp",
