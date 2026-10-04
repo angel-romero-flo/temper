@@ -157,5 +157,4 @@ fn seed_one(
 }
 
 #[cfg(test)]
-#[path = "environment_test.rs"]
 mod tests;
