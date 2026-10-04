@@ -8,9 +8,10 @@
 //!
 //! `<NAME>` is one or more of `A` to `Z`, `0` to `9` and `_`, starting with a
 //! letter, so that no two variables can supply the same secret. A variable
-//! that does not fit is skipped and reported by name. Values are never
-//! reported. A name the server already holds a platform secret for is left
-//! as it is, so what the server sets for itself at start wins.
+//! that does not fit, or whose value is larger than the secrets API accepts,
+//! is skipped and reported by name. Values are never reported. A name the
+//! server already holds a platform secret for is left as it is, so what the
+//! server sets for itself at start wins.
 //!
 //! Nothing here reads the process environment or writes to storage: the
 //! caller passes the variables in, and the secrets live in the vault's
@@ -19,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 
-use super::vault::SecretsVault;
+use super::vault::{MAX_SECRET_VALUE_BYTES, SecretsVault};
 
 /// Prefix of an environment variable that supplies a platform secret.
 pub const ENVIRONMENT_SECRET_PREFIX: &str = "TEMPER_SECRET_";
@@ -31,6 +32,8 @@ pub enum EnvironmentSecretSkip {
     InvalidName,
     /// The value is not valid UTF-8.
     ValueNotUnicode,
+    /// The value is larger than the secrets API accepts.
+    ValueTooLarge,
     /// The server already holds a platform secret of that name.
     AlreadySet,
     /// The platform layer has no room for another secret.
@@ -45,6 +48,7 @@ impl EnvironmentSecretSkip {
                 "the name after the prefix must be A-Z, 0-9 or _, starting with a letter"
             }
             Self::ValueNotUnicode => "the value is not valid UTF-8",
+            Self::ValueTooLarge => "the value is larger than the maximum size of a secret",
             Self::AlreadySet => "the server already sets a secret of that name",
             Self::BudgetExhausted => "the maximum number of platform secrets is reached",
         }
@@ -146,6 +150,9 @@ fn seed_one(
     let value = value
         .into_string()
         .map_err(|_| EnvironmentSecretSkip::ValueNotUnicode)?;
+    if value.len() > MAX_SECRET_VALUE_BYTES {
+        return Err(EnvironmentSecretSkip::ValueTooLarge);
+    }
     if vault.get_platform_secret(&secret).is_some() {
         return Err(EnvironmentSecretSkip::AlreadySet);
     }

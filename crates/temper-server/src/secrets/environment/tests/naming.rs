@@ -192,3 +192,32 @@ fn name_that_is_not_utf8_is_skipped_and_reported() {
     );
     assert!(vault.get_platform_secrets().is_empty());
 }
+
+#[test]
+fn value_over_the_size_limit_is_skipped_and_reported_by_name() {
+    let vault = test_vault();
+    let limit = crate::secrets::vault::MAX_SECRET_VALUE_BYTES;
+    let at_limit = "a".repeat(limit);
+    let over_limit = "b".repeat(limit + 1);
+
+    let (report, log) = seed_with_log(
+        &vault,
+        vars(&[
+            ("TEMPER_SECRET_AT_LIMIT", &at_limit),
+            ("TEMPER_SECRET_OVER_LIMIT", &over_limit),
+        ]),
+    );
+
+    assert_eq!(report.seeded, vec!["at_limit".to_string()]);
+    assert_eq!(
+        report.skipped,
+        vec![(
+            "TEMPER_SECRET_OVER_LIMIT".to_string(),
+            EnvironmentSecretSkip::ValueTooLarge
+        )]
+    );
+    assert_eq!(vault.get_platform_secret("at_limit"), Some(at_limit));
+    assert_eq!(vault.get_platform_secret("over_limit"), None);
+    assert!(log.contains("variable=TEMPER_SECRET_OVER_LIMIT "), "{log}");
+    assert!(!log.contains("bbbb"), "the log must not contain the value");
+}
