@@ -1286,7 +1286,22 @@ temper serve [--port PORT] [--specs-dir DIR] [--tenant NAME]
 | `OTLP_ENDPOINT` | For telemetry export | OTLP collector base URL (e.g., `http://localhost:4318`) |
 | `CLICKHOUSE_URL` | For analysis queries | ClickHouse HTTP endpoint (read path for trajectory analysis) |
 | `ANTHROPIC_API_KEY` | For agent mode | Claude API key |
+| `TEMPER_SECRET_<NAME>` | No | Supplies the secret `<name>` to every tenant from the moment the server is up. See [Secrets from the environment](#secrets-from-the-environment). |
 | `RUST_LOG` | No | Log level (default: `info,temper=debug`) |
+
+### Secrets from the environment
+
+`temper serve` seeds its secrets cache at start from every variable named `TEMPER_SECRET_<NAME>` that has a non-empty value. The secret is `<name>` in lower case: `TEMPER_SECRET_BUILD_TOKEN=abc` supplies the secret `build_token`, which a module reads with `get_secret("build_token")` and an integration config references as `{secret:build_token}`. With no such variable set, nothing changes.
+
+- **Naming rule.** `<NAME>` is one or more of `A` to `Z`, `0` to `9` and `_`, and starts with a letter. A variable that does not fit (`TEMPER_SECRET_` alone, a lower-case letter, a dash) is skipped and logged once at startup as a warning that gives the variable's name. The server still starts. An empty value is the same as an unset variable.
+- **Reach.** A seeded secret is a platform secret: every tenant reads it, including tenants created later. It is held in memory only and is not written to storage, so it has to be in the environment at every start. `GET /api/tenants/{tenant}/secrets` lists it by name.
+- **Who can read it.** Whoever can read any other secret of the tenant, by the same two routes. A module's `get_secret("<name>")` call needs a policy in its tenant that permits `access_secret` on `Secret::"<name>"`, and is refused without one. A `{secret:<name>}` template in an integration config is resolved when the integration runs, without that check, as it is for every secret. Because a seeded secret reaches every tenant, supply this way only what every tenant's specs may use.
+- **Precedence**, highest first:
+  1. A secret a tenant stored through the secrets API, for that tenant only, whether it was stored before or after the server started. Deleting it uncovers the seeded value again.
+  2. What the server sets itself at start: `anthropic_api_key` when `ANTHROPIC_API_KEY` is set, `exa_api_key` when `EXA_API_KEY` is set, and the addresses the server gives its own modules (such as `temper_api_url`). The prefixed variable of the same name is skipped and logged by name.
+  3. The prefixed variable.
+- **What is logged.** One line with the number of secrets seeded, and one warning for each skipped variable with its name. Values are never logged. With no `TEMPER_SECRET_` variable set, startup logs nothing about them.
+- **Budgets.** A value larger than 8192 bytes, the limit of the secrets API, is skipped and logged by name. The platform layer holds at most 100 secrets, the server's own included. Variables are taken in name order, and any beyond that are skipped and logged by name.
 
 ### Telemetry export settings
 
